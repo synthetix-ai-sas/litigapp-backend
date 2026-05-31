@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\LitigApp.Application\LitigApp.Application.csproj" />
+    <ProjectReference Include="..\LitigApp.Domain\LitigApp.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

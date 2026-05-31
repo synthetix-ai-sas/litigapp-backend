@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LitigApp.Api/LitigApp.Api.csproj" />
+    <Project Path="src/LitigApp.Application/LitigApp.Application.csproj" />
+    <Project Path="src/LitigApp.Domain/LitigApp.Domain.csproj" />
+    <Project Path="src/LitigApp.Infrastructure/LitigApp.Infrastructure.csproj" />
+    <Project Path="src/LitigApp.Jobs/LitigApp.Jobs.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LitigApp.Api.IntegrationTests/LitigApp.Api.IntegrationTests.csproj" />
+    <Project Path="tests/LitigApp.Application.UnitTests/LitigApp.Application.UnitTests.csproj" />
+    <Project Path="tests/LitigApp.Domain.UnitTests/LitigApp.Domain.UnitTests.csproj" />
+  </Folder>
+</Solution>
