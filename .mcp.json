@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "synthetix-ai-roslyn-navigator": {
+      "command": "dotnet",
+      "args": [
+        "tool",
+        "run",
+        "roslyn-navigator",
+        "--",
+        "--solution",
+        "."
+      ]
+    }
+  }
+}

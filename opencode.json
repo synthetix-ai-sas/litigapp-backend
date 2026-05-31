@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "synthetix-ai-roslyn-navigator": {
+      "type": "local",
+      "command": ["dotnet", "tool", "run", "roslyn-navigator", "--", "--solution", "."],
+      "enabled": true
+    }
+  }
+}
