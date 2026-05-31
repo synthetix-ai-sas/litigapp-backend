@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\LitigApp.Application\LitigApp.Application.csproj" />
+    <ProjectReference Include="..\LitigApp.Infrastructure\LitigApp.Infrastructure.csproj" />
+    <ProjectReference Include="..\LitigApp.Jobs\LitigApp.Jobs.csproj" />
+    <ProjectReference Include="..\LitigApp.Domain\LitigApp.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
