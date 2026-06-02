@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LitigApp.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260602145251_Initial")]
+    [Migration("20260602164953_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -28,16 +28,20 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("LitigApp.Domain.Catalog.City", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
                     b.Property<short>("DepartmentId")
-                        .HasColumnType("smallint");
+                        .HasColumnType("smallint")
+                        .HasColumnName("department_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("name");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_cities");
 
                     b.HasIndex("DepartmentId")
                         .HasDatabaseName("idx_cities_dept");
@@ -49,45 +53,58 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<int>("CityId")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("city_id");
 
                     b.Property<short?>("CourtNumber")
-                        .HasColumnType("smallint");
+                        .HasColumnType("smallint")
+                        .HasColumnName("court_number");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
 
                     b.Property<short?>("EntityId")
-                        .HasColumnType("smallint");
+                        .HasColumnType("smallint")
+                        .HasColumnName("entity_id");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
 
                     b.Property<DateTimeOffset?>("LastSyncedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("last_synced_at");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("name");
 
                     b.Property<string>("OfficialCode")
                         .IsRequired()
-                        .HasColumnType("char(12)");
+                        .HasColumnType("char(12)")
+                        .HasColumnName("official_code");
 
                     b.Property<string>("RawPayload")
-                        .HasColumnType("jsonb");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("raw_payload");
 
                     b.Property<short?>("SpecialtyId")
-                        .HasColumnType("smallint");
+                        .HasColumnType("smallint")
+                        .HasColumnName("specialty_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_courts");
 
-                    b.HasIndex("EntityId");
+                    b.HasIndex("EntityId")
+                        .HasDatabaseName("ix_courts_entity_id");
 
                     b.HasIndex("Name")
                         .HasDatabaseName("idx_courts_name_trgm");
@@ -99,7 +116,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_courts_official_code");
 
-                    b.HasIndex("SpecialtyId");
+                    b.HasIndex("SpecialtyId")
+                        .HasDatabaseName("ix_courts_specialty_id");
 
                     b.HasIndex("CityId", "SpecialtyId")
                         .HasDatabaseName("idx_courts_city_spec");
@@ -110,13 +128,16 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("LitigApp.Domain.Catalog.Department", b =>
                 {
                     b.Property<short>("Id")
-                        .HasColumnType("smallint");
+                        .HasColumnType("smallint")
+                        .HasColumnName("id");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("name");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_departments");
 
                     b.ToTable("departments", (string)null);
                 });
@@ -124,17 +145,21 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("LitigApp.Domain.Catalog.Entity", b =>
                 {
                     b.Property<short>("Id")
-                        .HasColumnType("smallint");
+                        .HasColumnType("smallint")
+                        .HasColumnName("id");
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasColumnType("char(2)");
+                        .HasColumnType("char(2)")
+                        .HasColumnName("code");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("name");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_entities");
 
                     b.HasIndex("Code")
                         .IsUnique()
@@ -146,17 +171,21 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("LitigApp.Domain.Catalog.Specialty", b =>
                 {
                     b.Property<short>("Id")
-                        .HasColumnType("smallint");
+                        .HasColumnType("smallint")
+                        .HasColumnName("id");
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasColumnType("char(2)");
+                        .HasColumnType("char(2)")
+                        .HasColumnName("code");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("name");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_specialties");
 
                     b.HasIndex("Code")
                         .IsUnique()
@@ -168,21 +197,27 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("LitigApp.Domain.Common.SyncState", b =>
                 {
                     b.Property<string>("Key")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("key");
 
                     b.Property<string>("Reason")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
 
                     b.Property<string>("ValueText")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("value_text");
 
                     b.Property<DateTimeOffset?>("ValueTimestamp")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("value_timestamp");
 
-                    b.HasKey("Key");
+                    b.HasKey("Key")
+                        .HasName("pk_sync_state");
 
                     b.ToTable("sync_state", (string)null);
                 });
@@ -191,55 +226,68 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<string>("ColumnMapping")
-                        .HasColumnType("jsonb");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("column_mapping");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("completed_at");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
 
                     b.Property<int>("ErrorCount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasDefaultValue(0)
+                        .HasColumnName("error_count");
 
                     b.Property<string>("Errors")
-                        .HasColumnType("jsonb");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("errors");
 
                     b.Property<string>("FileName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("file_name");
 
                     b.Property<int>("ProcessedRows")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasDefaultValue(0)
+                        .HasColumnName("processed_rows");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
-                        .HasDefaultValue("pending");
+                        .HasDefaultValue("pending")
+                        .HasColumnName("status");
 
                     b.Property<int>("SuccessCount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasDefaultValue(0)
+                        .HasColumnName("success_count");
 
                     b.Property<int>("TotalRows")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasDefaultValue(0)
+                        .HasColumnName("total_rows");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_import_jobs");
 
                     b.HasIndex("UserId", "CreatedAt")
                         .IsDescending(false, true)
@@ -252,43 +300,55 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<string>("Channel")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("channel");
 
                     b.Property<string>("EventType")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("event_type");
 
                     b.Property<Guid?>("OutboxId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("outbox_id");
 
                     b.PrimitiveCollection<Guid[]>("ProcessIds")
                         .IsRequired()
-                        .HasColumnType("uuid[]");
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("process_ids");
 
                     b.Property<string>("ProviderMessageId")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("provider_message_id");
 
                     b.Property<string>("RawResponse")
-                        .HasColumnType("jsonb");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("raw_response");
 
                     b.Property<DateTimeOffset>("SentAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("sent_at");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("status");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_notification_logs");
 
-                    b.HasIndex("OutboxId");
+                    b.HasIndex("OutboxId")
+                        .HasDatabaseName("ix_notification_logs_outbox_id");
 
                     b.HasIndex("UserId", "SentAt")
                         .IsDescending(false, true)
@@ -301,45 +361,56 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<short>("Attempts")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("smallint")
-                        .HasDefaultValue((short)0);
+                        .HasDefaultValue((short)0)
+                        .HasColumnName("attempts");
 
                     b.Property<string>("Channel")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("channel");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("EventType")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("event_type");
 
                     b.Property<string>("LastError")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
 
                     b.Property<string>("Payload")
                         .IsRequired()
-                        .HasColumnType("jsonb");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
 
                     b.Property<DateTimeOffset?>("ProcessedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("processed_at");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
-                        .HasDefaultValue("pending");
+                        .HasDefaultValue("pending")
+                        .HasColumnName("status");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_notifications_outbox");
 
                     b.HasIndex("Status", "CreatedAt")
                         .HasDatabaseName("idx_outbox_status_created")
@@ -352,110 +423,140 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<bool>("Attended")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasDefaultValue(true)
+                        .HasColumnName("attended");
 
                     b.Property<Guid?>("CourtId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("court_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("CurrentStatus")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("current_status");
 
                     b.Property<string>("CustomAlias")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("custom_alias");
 
                     b.Property<int?>("ExternalConnectionId")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("external_connection_id");
 
                     b.Property<long?>("ExternalProcessId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("bigint")
+                        .HasColumnName("external_process_id");
 
                     b.Property<string>("FileNumber")
                         .IsRequired()
-                        .HasColumnType("char(23)");
+                        .HasColumnType("char(23)")
+                        .HasColumnName("file_number");
 
                     b.Property<string>("FilingContent")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("filing_content");
 
                     b.Property<short?>("FilingYear")
-                        .HasColumnType("smallint");
+                        .HasColumnType("smallint")
+                        .HasColumnName("filing_year");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
 
                     b.Property<bool>("IsPrivate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false);
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_private");
 
                     b.Property<string>("JudgeName")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("judge_name");
 
                     b.Property<DateTimeOffset?>("LastCourtActionAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("last_court_action_at");
 
                     b.Property<int>("LastExternalConsecutive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasDefaultValue(0)
+                        .HasColumnName("last_external_consecutive");
 
                     b.Property<DateTimeOffset?>("LastSyncAttemptAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("last_sync_attempt_at");
 
                     b.Property<DateTimeOffset?>("LastSyncedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("last_synced_at");
 
                     b.Property<string>("ProcessClass")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("process_class");
 
                     b.Property<string>("ProcessSubclass")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("process_subclass");
 
                     b.Property<string>("ProcessType")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("process_type");
 
                     b.Property<string>("Resource")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("resource");
 
                     b.Property<int>("SyncAttempts")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasDefaultValue(0)
+                        .HasColumnName("sync_attempts");
 
                     b.Property<string>("SyncError")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("sync_error");
 
                     b.Property<string>("SyncPhase")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
-                        .HasDefaultValue("pending_initial_full");
+                        .HasDefaultValue("pending_initial_full")
+                        .HasColumnName("sync_phase");
 
                     b.Property<string>("SyncStatus")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
-                        .HasDefaultValue("pending");
+                        .HasDefaultValue("pending")
+                        .HasColumnName("sync_status");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_processes");
 
-                    b.HasIndex("CourtId");
+                    b.HasIndex("CourtId")
+                        .HasDatabaseName("ix_processes_court_id");
 
                     b.HasIndex("ExternalProcessId")
                         .HasDatabaseName("idx_processes_external");
@@ -486,55 +587,72 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<string>("Action")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("action");
 
                     b.Property<DateOnly?>("ActionDate")
-                        .HasColumnType("date");
+                        .HasColumnType("date")
+                        .HasColumnName("action_date");
 
                     b.Property<string>("Annotation")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("annotation");
 
                     b.Property<int>("ConsecutiveNumber")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("consecutive_number");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
 
                     b.Property<long>("ExternalActionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("bigint")
+                        .HasColumnName("external_action_id");
 
                     b.Property<Guid?>("GroupedWithId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("grouped_with_id");
 
                     b.Property<bool>("HasDocuments")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false);
+                        .HasDefaultValue(false)
+                        .HasColumnName("has_documents");
 
                     b.Property<Guid>("ProcessId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_id");
 
                     b.Property<string>("RawPayload")
-                        .HasColumnType("jsonb");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("raw_payload");
 
                     b.Property<DateOnly?>("RecordedAt")
-                        .HasColumnType("date");
+                        .HasColumnType("date")
+                        .HasColumnName("recorded_at");
 
                     b.Property<string>("RuleCode")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("rule_code");
 
                     b.Property<DateOnly?>("TermEndDate")
-                        .HasColumnType("date");
+                        .HasColumnType("date")
+                        .HasColumnName("term_end_date");
 
                     b.Property<DateOnly?>("TermStartDate")
-                        .HasColumnType("date");
+                        .HasColumnType("date")
+                        .HasColumnName("term_start_date");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_process_actions");
 
-                    b.HasIndex("GroupedWithId");
+                    b.HasIndex("GroupedWithId")
+                        .HasDatabaseName("ix_process_actions_grouped_with_id");
 
                     b.HasIndex("ProcessId", "ConsecutiveNumber")
                         .IsDescending(false, true)
@@ -554,43 +672,54 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
 
                     b.Property<long?>("ExternalSubjectId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("bigint")
+                        .HasColumnName("external_subject_id");
 
                     b.Property<string>("Identification")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("identification");
 
                     b.Property<bool>("IsSummoned")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false);
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_summoned");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("name");
 
                     b.Property<Guid>("ProcessId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_id");
 
                     b.Property<string>("RawPayload")
-                        .HasColumnType("jsonb");
+                        .HasColumnType("jsonb")
+                        .HasColumnName("raw_payload");
 
                     b.Property<string>("Source")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
-                        .HasDefaultValue("api");
+                        .HasDefaultValue("api")
+                        .HasColumnName("source");
 
                     b.Property<string>("SubjectType")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("subject_type");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_process_subjects");
 
                     b.HasIndex("ProcessId", "SubjectType")
                         .HasDatabaseName("idx_subjects_process_type");
@@ -601,28 +730,35 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("LitigApp.Domain.Users.UserNotificationPreferences", b =>
                 {
                     b.Property<string>("UserId")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
 
                     b.Property<bool>("EmailEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasDefaultValue(true)
+                        .HasColumnName("email_enabled");
 
                     b.Property<TimeOnly?>("QuietHoursEnd")
-                        .HasColumnType("time");
+                        .HasColumnType("time")
+                        .HasColumnName("quiet_hours_end");
 
                     b.Property<TimeOnly?>("QuietHoursStart")
-                        .HasColumnType("time");
+                        .HasColumnType("time")
+                        .HasColumnName("quiet_hours_start");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamptz");
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
 
                     b.Property<bool>("WhatsAppEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false);
+                        .HasDefaultValue(false)
+                        .HasColumnName("whats_app_enabled");
 
-                    b.HasKey("UserId");
+                    b.HasKey("UserId")
+                        .HasName("pk_user_notification_preferences");
 
                     b.ToTable("user_notification_preferences", (string)null);
                 });
@@ -630,66 +766,85 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("LitigApp.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("id");
 
                     b.Property<int>("AccessFailedCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("access_failed_count");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("concurrency_stamp");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
 
                     b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("boolean");
+                        .HasColumnType("boolean")
+                        .HasColumnName("email_confirmed");
 
                     b.Property<string>("FullName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("full_name");
 
                     b.Property<bool>("LockoutEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("boolean")
+                        .HasColumnName("lockout_enabled");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lockout_end");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("normalized_email");
 
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("normalized_user_name");
 
                     b.Property<string>("PasswordHash")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("password_hash");
 
                     b.Property<string>("PhoneNumber")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("phone_number");
 
                     b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("boolean");
+                        .HasColumnType("boolean")
+                        .HasColumnName("phone_number_confirmed");
 
                     b.Property<string>("SecurityStamp")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("security_stamp");
 
                     b.Property<bool>("TwoFactorEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("boolean")
+                        .HasColumnName("two_factor_enabled");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("user_name");
 
                     b.Property<string>("WhatsAppPhone")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("whats_app_phone");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_asp_net_users");
 
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
@@ -704,21 +859,26 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("id");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("concurrency_stamp");
 
                     b.Property<string>("Name")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("name");
 
                     b.Property<string>("NormalizedName")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("normalized_name");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_asp_net_roles");
 
                     b.HasIndex("NormalizedName")
                         .IsUnique()
@@ -731,23 +891,29 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("claim_type");
 
                     b.Property<string>("ClaimValue")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("claim_value");
 
                     b.Property<string>("RoleId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("role_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_asp_net_role_claims");
 
-                    b.HasIndex("RoleId");
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_asp_net_role_claims_role_id");
 
                     b.ToTable("AspNetRoleClaims", (string)null);
                 });
@@ -756,23 +922,29 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("claim_type");
 
                     b.Property<string>("ClaimValue")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("claim_value");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_asp_net_user_claims");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_asp_net_user_claims_user_id");
 
                     b.ToTable("AspNetUserClaims", (string)null);
                 });
@@ -780,21 +952,27 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
                     b.Property<string>("LoginProvider")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("login_provider");
 
                     b.Property<string>("ProviderKey")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("provider_key");
 
                     b.Property<string>("ProviderDisplayName")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("provider_display_name");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
 
-                    b.HasKey("LoginProvider", "ProviderKey");
+                    b.HasKey("LoginProvider", "ProviderKey")
+                        .HasName("pk_asp_net_user_logins");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_asp_net_user_logins_user_id");
 
                     b.ToTable("AspNetUserLogins", (string)null);
                 });
@@ -802,14 +980,18 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
                 {
                     b.Property<string>("UserId")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
 
                     b.Property<string>("RoleId")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("role_id");
 
-                    b.HasKey("UserId", "RoleId");
+                    b.HasKey("UserId", "RoleId")
+                        .HasName("pk_asp_net_user_roles");
 
-                    b.HasIndex("RoleId");
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_asp_net_user_roles_role_id");
 
                     b.ToTable("AspNetUserRoles", (string)null);
                 });
@@ -817,18 +999,23 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
                     b.Property<string>("UserId")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
 
                     b.Property<string>("LoginProvider")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("login_provider");
 
                     b.Property<string>("Name")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("name");
 
                     b.Property<string>("Value")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("value");
 
-                    b.HasKey("UserId", "LoginProvider", "Name");
+                    b.HasKey("UserId", "LoginProvider", "Name")
+                        .HasName("pk_asp_net_user_tokens");
 
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
@@ -839,7 +1026,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .WithMany("Cities")
                         .HasForeignKey("DepartmentId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_cities_departments_department_id");
 
                     b.Navigation("Department");
                 });
@@ -850,17 +1038,20 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .WithMany("Courts")
                         .HasForeignKey("CityId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_courts_cities_city_id");
 
                     b.HasOne("LitigApp.Domain.Catalog.Entity", "JudicialEntity")
                         .WithMany("Courts")
                         .HasForeignKey("EntityId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_courts_entities_entity_id");
 
                     b.HasOne("LitigApp.Domain.Catalog.Specialty", "Specialty")
                         .WithMany("Courts")
                         .HasForeignKey("SpecialtyId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_courts_specialties_specialty_id");
 
                     b.Navigation("City");
 
@@ -874,7 +1065,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                     b.HasOne("LitigApp.Domain.Notifications.OutboxMessage", "Outbox")
                         .WithMany()
                         .HasForeignKey("OutboxId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_notification_logs_outbox_messages_outbox_id");
 
                     b.Navigation("Outbox");
                 });
@@ -884,7 +1076,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                     b.HasOne("LitigApp.Domain.Catalog.Court", "Court")
                         .WithMany()
                         .HasForeignKey("CourtId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_processes_courts_court_id");
 
                     b.Navigation("Court");
                 });
@@ -894,13 +1087,15 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                     b.HasOne("LitigApp.Domain.Processes.ProcessAction", "GroupedWith")
                         .WithMany()
                         .HasForeignKey("GroupedWithId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_process_actions_process_actions_grouped_with_id");
 
                     b.HasOne("LitigApp.Domain.Processes.Process", "Process")
                         .WithMany("Actions")
                         .HasForeignKey("ProcessId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_process_actions_processes_process_id");
 
                     b.Navigation("GroupedWith");
 
@@ -913,7 +1108,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .WithMany("Subjects")
                         .HasForeignKey("ProcessId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_process_subjects_processes_process_id");
 
                     b.Navigation("Process");
                 });
@@ -924,7 +1120,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_asp_net_role_claims_asp_net_roles_role_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
@@ -933,7 +1130,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_asp_net_user_claims_asp_net_users_user_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
@@ -942,7 +1140,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_asp_net_user_logins_asp_net_users_user_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
@@ -951,13 +1150,15 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_asp_net_user_roles_asp_net_roles_role_id");
 
                     b.HasOne("LitigApp.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_asp_net_user_roles_asp_net_users_user_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
@@ -966,7 +1167,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_asp_net_user_tokens_asp_net_users_user_id");
                 });
 
             modelBuilder.Entity("LitigApp.Domain.Catalog.City", b =>

@@ -18,7 +18,9 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Connection string 'Postgres' is not configured.");
 
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(connectionString));
+            options
+                .UseNpgsql(connectionString)
+                .UseSnakeCaseNamingConvention());
 
         // ASP.NET Core Identity
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
