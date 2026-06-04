@@ -67,6 +67,65 @@ Job (Hangfire) → Service (Application/Infrastructure) → `IRamaJudicialClient
 6. **Records para DTOs** y value objects inmutables.
 7. **Migraciones EF versionadas en git**: nunca borres una aplicada.
 
+## Herramientas disponibles en este repo
+
+Tienes acceso a las siguientes herramientas además de las skills globales
+(superpowers, gstack). ÚSALAS PROACTIVAMENTE:
+
+### Roslyn Navigator (Semantic Code Navigation)
+Utiliza las herramientas MCP de Roslyn Navigator en lugar de leer los archivos fuente cuando necesites comprender el código. Esto ahorra una cantidad significativa de tokens.
+
+**Da preferencia a estas herramientas frente a `Read` cuando:**
+- **Comiences una tarea sin contexto:** `get_project_graph` → comprender la estructura de la solución
+- **Localices un tipo o método:** `find_symbol` → saltar directamente a la definición
+- **Comprender la forma de un tipo:** `get_public_api`, `get_symbol_detail`
+- **Rastrees cadenas de llamadas o realices análisis de impacto:** `find_callers`, `find_references`
+- **Trabajes con interfaces o DI:** `find_implementations`, `get_type_hierarchy`
+- **Trabajar con métodos virtuales/abstractos:** `find_overrides` para localizar todas las implementaciones concretas
+- **Migrar de una interfáz ITernface1 a ITernface2:** `find_callers` para encontrar todos los consumidores antes de realizar el cambio
+- **Añadir a la infraestructura:** `find_symbol` + `get_dependency_graph` para mapear el flujo existente
+- **Antes de compilar o comprobar el estado del compilador:** `get_diagnostics` para ver advertencias y errores
+- **Comprobación de la cobertura de pruebas:** `get_test_coverage_map` para identificar áreas sin probar
+- **Comprobaciones de estado / deuda técnica:** `find_dead_code`, `detect_antipatterns`, `detect_circular_dependencies`
+
+**Regla:** Prueba siempre primero una herramienta de Roslyn Navigator. Recurre a `Read` solo si la herramienta no devuelve suficientes detalles (por ejemplo, si necesitas el cuerpo completo del método).
+
+### dotnet toolkit
+Consulta el dotnet toolkit cuando:
+- Diseñas un nuevo handler CQRS, repositorio o configuration EF.
+- Aplicas patterns de Polly, Hangfire, ASP.NET Core Identity, JWT, Loggin, Api versioning, Session Management.
+- Estructuras un nuevo csproj o feature folder, DDD, docker.
+
+Si el toolkit sugiere algo distinto al blueprint, EL BLUEPRINT MANDA.
+El toolkit es referencia genérica; el blueprint es decisión específica
+de este proyecto.
+
+### Skills de gstack relevantes para este proyecto
+- `/autoplan` — antes de codear features complejas (sync engine, imports).
+- `/plan-eng-review` — validar el plan antes de implementar.
+- `/review` — code review propio antes de pedir review humana.
+- `/ship` — para crear commit + push + PR con formato consistente.
+
+### Skills de superpowers relevantes
+- `superpowers:test-driven-development` — antes de implementar features
+  no triviales (handlers, sync engine, parsers).
+- `superpowers:systematic-debugging` — cuando encuentres bugs que no
+  cedan en 15 minutos.
+- `superpowers:verification-before-completion` — antes de declarar una
+  tarea terminada (corre los comandos, no asumas).
+- `superpowers:requesting-code-review` — antes de pedir PR review.
+
+## Prioridad entre fuentes de verdad
+
+Si hay conflicto entre las fuentes:
+1. **Blueprint** (docs/blueprint.md) — máxima autoridad sobre decisiones de
+   arquitectura, schema, contratos.
+2. **Execution plan** (docs/execution-plan.md) — qué owner toca qué tarea
+   y en qué orden.
+3. **dotnet toolkit / convenciones .NET genéricas** — solo cuando el
+   blueprint no se pronuncia.
+4. **Sugerencias propias del modelo** — última prioridad.
+
 ## Environment Variables
 
 Ver sección 12 del blueprint. Sensibles SOLO en env vars / user-secrets, nunca en código. `appsettings.json` versionado sin secretos; `appsettings.Development.json` en `.gitignore`.
