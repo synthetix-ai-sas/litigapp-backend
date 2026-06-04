@@ -492,36 +492,40 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";          -- búsqueda fuzzy en nombres
 -- CATÁLOGO GEOGRÁFICO Y JUDICIAL (precargado, raramente cambia)
 -- =====================================================================
 
+-- IMPORTANTE: los IDs de catálogo son códigos DANE oficiales (natural keys,
+-- no surrogate keys). DANE los define como strings con ceros a la izquierda
+-- ("05" Antioquia, "08" Atlántico, "17001" Manizales). Por eso usamos char(N)
+-- de longitud fija, NO int/smallint. Si usas int, "05" se guarda como 5 y
+-- pierdes información para componer el radicado.
+
 CREATE TABLE departments (
-  id smallint PRIMARY KEY,                         -- código DANE 2 dígitos (17 = Caldas)
+  id char(2) PRIMARY KEY,                          -- código DANE: "05", "11", "17", ...
   name text NOT NULL
 );
 
 CREATE TABLE cities (
-  id integer PRIMARY KEY,                          -- código DANE 5 dígitos (17001 = Manizales)
-  department_id smallint NOT NULL REFERENCES departments(id),
+  id char(5) PRIMARY KEY,                          -- código DANE: "05001", "17001", "11001", ...
+  department_id char(2) NOT NULL REFERENCES departments(id),
   name text NOT NULL
 );
 CREATE INDEX idx_cities_dept ON cities(department_id);
 
 CREATE TABLE entities (
-  id smallint PRIMARY KEY,
-  code char(2) NOT NULL UNIQUE,                    -- "71"
+  code char(2) PRIMARY KEY,                        -- "71"
   name text NOT NULL                               -- "CENTRO DE SERVICIOS JUDICIALES"
 );
 
 CREATE TABLE specialties (
-  id smallint PRIMARY KEY,
-  code char(2) NOT NULL UNIQUE,                    -- "03"
+  code char(2) PRIMARY KEY,                        -- "03"
   name text NOT NULL                               -- "CIVIL"
 );
 
 CREATE TABLE courts (
   id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   official_code char(12) NOT NULL UNIQUE,          -- codDespachoCompleto de la API
-  city_id integer NOT NULL REFERENCES cities(id),
-  entity_id smallint REFERENCES entities(id),      -- nullable hasta validar contra catálogo
-  specialty_id smallint REFERENCES specialties(id),
+  city_id char(5) NOT NULL REFERENCES cities(id),
+  entity_code char(2) REFERENCES entities(code),   -- nullable hasta validar contra catálogo
+  specialty_code char(2) REFERENCES specialties(code),
   court_number smallint,
   name text NOT NULL,                              -- "JUZGADO 002 CIVIL MUNICIPAL DE..."
   is_active boolean NOT NULL DEFAULT true,
@@ -529,7 +533,7 @@ CREATE TABLE courts (
   last_synced_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_courts_city_spec ON courts(city_id, specialty_id);
+CREATE INDEX idx_courts_city_spec ON courts(city_id, specialty_code);
 CREATE INDEX idx_courts_name_trgm ON courts USING gin (name gin_trgm_ops);
 
 -- =====================================================================
