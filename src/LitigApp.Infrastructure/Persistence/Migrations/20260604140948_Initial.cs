@@ -12,6 +12,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Postgres extensions not emitted automatically by EF Core.
+            // uuid-ossp first: some tables use uuid_generate_v4() as default.
             migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";");
             migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS \"pg_trgm\";");
 
@@ -61,7 +63,7 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 name: "departments",
                 columns: table => new
                 {
-                    id = table.Column<short>(type: "smallint", nullable: false),
+                    id = table.Column<string>(type: "char(2)", fixedLength: true, nullable: false),
                     name = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
@@ -73,13 +75,12 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 name: "entities",
                 columns: table => new
                 {
-                    id = table.Column<short>(type: "smallint", nullable: false),
-                    code = table.Column<string>(type: "char(2)", nullable: false),
+                    code = table.Column<string>(type: "char(2)", fixedLength: true, nullable: false),
                     name = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("pk_entities", x => x.id);
+                    table.PrimaryKey("pk_entities", x => x.code);
                 });
 
             migrationBuilder.CreateTable(
@@ -128,13 +129,12 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 name: "specialties",
                 columns: table => new
                 {
-                    id = table.Column<short>(type: "smallint", nullable: false),
-                    code = table.Column<string>(type: "char(2)", nullable: false),
+                    code = table.Column<string>(type: "char(2)", fixedLength: true, nullable: false),
                     name = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("pk_specialties", x => x.id);
+                    table.PrimaryKey("pk_specialties", x => x.code);
                 });
 
             migrationBuilder.CreateTable(
@@ -278,8 +278,8 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 name: "cities",
                 columns: table => new
                 {
-                    id = table.Column<int>(type: "integer", nullable: false),
-                    department_id = table.Column<short>(type: "smallint", nullable: false),
+                    id = table.Column<string>(type: "char(5)", fixedLength: true, nullable: false),
+                    department_id = table.Column<string>(type: "char(2)", fixedLength: true, nullable: false),
                     name = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
@@ -324,10 +324,10 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    official_code = table.Column<string>(type: "char(12)", nullable: false),
-                    city_id = table.Column<int>(type: "integer", nullable: false),
-                    entity_id = table.Column<short>(type: "smallint", nullable: true),
-                    specialty_id = table.Column<short>(type: "smallint", nullable: true),
+                    official_code = table.Column<string>(type: "char(12)", fixedLength: true, nullable: false),
+                    city_id = table.Column<string>(type: "char(5)", fixedLength: true, nullable: false),
+                    entity_code = table.Column<string>(type: "char(2)", fixedLength: true, nullable: true),
+                    specialty_code = table.Column<string>(type: "char(2)", fixedLength: true, nullable: true),
                     court_number = table.Column<short>(type: "smallint", nullable: true),
                     name = table.Column<string>(type: "text", nullable: false),
                     is_active = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
@@ -345,16 +345,16 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "fk_courts_entities_entity_id",
-                        column: x => x.entity_id,
+                        name: "fk_courts_entities_entity_code",
+                        column: x => x.entity_code,
                         principalTable: "entities",
-                        principalColumn: "id",
+                        principalColumn: "code",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
-                        name: "fk_courts_specialties_specialty_id",
-                        column: x => x.specialty_id,
+                        name: "fk_courts_specialties_specialty_code",
+                        column: x => x.specialty_code,
                         principalTable: "specialties",
-                        principalColumn: "id",
+                        principalColumn: "code",
                         onDelete: ReferentialAction.SetNull);
                 });
 
@@ -511,7 +511,7 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             migrationBuilder.CreateIndex(
                 name: "idx_courts_city_spec",
                 table: "courts",
-                columns: new[] { "city_id", "specialty_id" });
+                columns: new[] { "city_id", "specialty_code" });
 
             migrationBuilder.CreateIndex(
                 name: "idx_courts_name_trgm",
@@ -521,9 +521,9 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 .Annotation("Npgsql:IndexOperators", new[] { "gin_trgm_ops" });
 
             migrationBuilder.CreateIndex(
-                name: "ix_courts_entity_id",
+                name: "ix_courts_entity_code",
                 table: "courts",
-                column: "entity_id");
+                column: "entity_code");
 
             migrationBuilder.CreateIndex(
                 name: "ix_courts_official_code",
@@ -532,15 +532,9 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "ix_courts_specialty_id",
+                name: "ix_courts_specialty_code",
                 table: "courts",
-                column: "specialty_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_entities_code",
-                table: "entities",
-                column: "code",
-                unique: true);
+                column: "specialty_code");
 
             migrationBuilder.CreateIndex(
                 name: "idx_imports_user_created",
@@ -597,8 +591,11 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 table: "processes",
                 column: "external_process_id");
 
-            migrationBuilder.Sql(
-                "CREATE INDEX idx_processes_sync_phase ON processes (sync_phase, last_sync_attempt_at NULLS FIRST) WHERE is_active = true;");
+            migrationBuilder.CreateIndex(
+                name: "idx_processes_sync_phase",
+                table: "processes",
+                columns: new[] { "sync_phase", "last_sync_attempt_at" },
+                filter: "is_active = true");
 
             migrationBuilder.CreateIndex(
                 name: "idx_processes_user_active",
@@ -621,12 +618,6 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                 name: "uq_processes_user_file",
                 table: "processes",
                 columns: new[] { "user_id", "file_number" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "ix_specialties_code",
-                table: "specialties",
-                column: "code",
                 unique: true);
         }
 
@@ -693,6 +684,7 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
             migrationBuilder.DropTable(
                 name: "departments");
 
+            // Drop extensions in reverse order of creation.
             migrationBuilder.Sql("DROP EXTENSION IF EXISTS \"pg_trgm\";");
             migrationBuilder.Sql("DROP EXTENSION IF EXISTS \"uuid-ossp\";");
         }

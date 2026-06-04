@@ -11,8 +11,8 @@ public class CityConfiguration : IEntityTypeConfiguration<City>
         builder.ToTable("cities");
 
         builder.HasKey(c => c.Id);
-        builder.Property(c => c.Id).HasColumnType("integer").ValueGeneratedNever();
-        builder.Property(c => c.DepartmentId).IsRequired().HasColumnType("smallint");
+        builder.Property(c => c.Id).HasColumnType("char(5)").IsFixedLength().ValueGeneratedNever();
+        builder.Property(c => c.DepartmentId).IsRequired().HasColumnType("char(2)").IsFixedLength();
         builder.Property(c => c.Name).IsRequired().HasColumnType("text");
 
         builder.HasIndex(c => c.DepartmentId)

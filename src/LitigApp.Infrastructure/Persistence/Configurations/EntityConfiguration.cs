@@ -10,13 +10,8 @@ public class EntityConfiguration : IEntityTypeConfiguration<Entity>
     {
         builder.ToTable("entities");
 
-        builder.HasKey(e => e.Id);
-        builder.Property(e => e.Id).HasColumnType("smallint").ValueGeneratedNever();
-        builder.Property(e => e.Code).IsRequired().HasColumnType("char(2)");
+        builder.HasKey(e => e.Code);
+        builder.Property(e => e.Code).HasColumnType("char(2)").IsFixedLength().ValueGeneratedNever();
         builder.Property(e => e.Name).IsRequired().HasColumnType("text");
-
-        builder.HasIndex(e => e.Code)
-            .IsUnique()
-            .HasDatabaseName("ix_entities_code");
     }
 }
