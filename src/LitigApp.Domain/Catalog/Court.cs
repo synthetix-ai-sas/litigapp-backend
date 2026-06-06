@@ -7,9 +7,12 @@ public class Court
     /// <summary>codDespachoCompleto from the API — 12 chars, unique.</summary>
     public string OfficialCode { get; set; } = string.Empty;
 
-    public int CityId { get; set; }
-    public short? EntityId { get; set; }
-    public short? SpecialtyId { get; set; }
+    /// <summary>FK to City.Id — DANE 5-char code (char(5)).</summary>
+    public string CityId { get; set; } = string.Empty;
+    /// <summary>FK to Entity.Code — DANE 2-char code (char(2)). Nullable until validated against catalog.</summary>
+    public string? EntityCode { get; set; }
+    /// <summary>FK to Specialty.Code — DANE 2-char code (char(2)). Nullable until validated against catalog.</summary>
+    public string? SpecialtyCode { get; set; }
     public short? CourtNumber { get; set; }
     public string Name { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
