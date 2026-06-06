@@ -1,3 +1,5 @@
+using LitigApp.Application.Common.Abstractions;
+using LitigApp.Infrastructure.Catalog;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -35,6 +37,10 @@ public static class DependencyInjection
             })
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders();
+
+        // Catalog
+        services.AddMemoryCache();
+        services.AddScoped<ICatalogReader, CachedCatalogReader>();
 
         return services;
     }

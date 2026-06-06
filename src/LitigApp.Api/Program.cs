@@ -1,15 +1,40 @@
+using System.Text;
+using LitigApp.Application;
 using LitigApp.Infrastructure;
 using LitigApp.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddApplication();
+
+// JWT Bearer auth — secret comes from Jwt:Secret env var in production
+var jwtSection = builder.Configuration.GetSection("Jwt");
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSection["Issuer"],
+            ValidAudience = jwtSection["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSection["Secret"]!))
+        };
+    });
+
+builder.Services.AddAuthorization();
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
 // CLI: `dotnet run --project src/LitigApp.Api -- seed-catalog`
-// Seeds the geographic/judicial catalog and exits without starting the web host.
 if (args.Contains("seed-catalog"))
 {
     using var scope = app.Services.CreateScope();
@@ -18,9 +43,11 @@ if (args.Contains("seed-catalog"))
     return;
 }
 
-app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapControllers();
 
 app.Run();
 
