@@ -1,9 +1,15 @@
+using System.Net;
+using LitigApp.Application.Common.Abstractions;
+using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Persistence;
+using LitigApp.Infrastructure.Time;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
 
 namespace LitigApp.Infrastructure;
 
@@ -13,7 +19,7 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Database
+        // ── Database ──────────────────────────────────────────────────────────
         var connectionString = configuration.GetConnectionString("Postgres")
             ?? throw new InvalidOperationException("Connection string 'Postgres' is not configured.");
 
@@ -22,7 +28,7 @@ public static class DependencyInjection
                 .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention());
 
-        // ASP.NET Core Identity
+        // ── ASP.NET Core Identity ─────────────────────────────────────────────
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             {
                 options.Password.RequiredLength = 8;
@@ -31,10 +37,63 @@ public static class DependencyInjection
                 options.Password.RequireUppercase = false;
                 options.Password.RequireNonAlphanumeric = false;
                 options.User.RequireUniqueEmail = true;
-                options.SignIn.RequireConfirmedEmail = false; // true in production
+                options.SignIn.RequireConfirmedEmail = false; // set to true in production
             })
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders();
+
+        // ── Time ──────────────────────────────────────────────────────────────
+        services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
+
+        // ── Rama Judicial HTTP client ─────────────────────────────────────────
+        services.Configure<RamaJudicialOptions>(
+            configuration.GetSection(RamaJudicialOptions.SectionName));
+
+        services
+            .AddHttpClient<IRamaJudicialClient, RamaJudicialClient>((sp, client) =>
+            {
+                var opts = sp.GetRequiredService<
+                    Microsoft.Extensions.Options.IOptions<RamaJudicialOptions>>().Value;
+                client.BaseAddress = new Uri(opts.BaseUrl);
+            })
+            .AddResilienceHandler("rama-judicial", (builder, context) =>
+            {
+                var opts = context.ServiceProvider.GetRequiredService<
+                    Microsoft.Extensions.Options.IOptions<RamaJudicialOptions>>().Value;
+
+                // Total timeout caps the full operation including all retries
+                builder.AddTimeout(TimeSpan.FromSeconds(opts.TimeoutSeconds * 4));
+
+                // Retry only on transient failures — never on 403/404/400
+                builder.AddRetry(new HttpRetryStrategyOptions
+                {
+                    MaxRetryAttempts = 2,
+                    BackoffType = DelayBackoffType.Exponential,
+                    Delay = TimeSpan.FromSeconds(1),
+                    UseJitter = true,
+                    ShouldHandle = static args =>
+                    {
+                        // Never retry definitive or WAF-blocked responses
+                        var status = args.Outcome.Result?.StatusCode;
+                        if (status is HttpStatusCode.Forbidden
+                                   or HttpStatusCode.NotFound
+                                   or HttpStatusCode.BadRequest)
+                            return ValueTask.FromResult(false);
+
+                        // Retry on exceptions (network, per-attempt timeout)
+                        if (args.Outcome.Exception is not null)
+                            return ValueTask.FromResult(true);
+
+                        // Retry on 5xx or 408
+                        return ValueTask.FromResult(
+                            status == HttpStatusCode.RequestTimeout ||
+                            (status.HasValue && (int)status.Value >= 500));
+                    }
+                });
+
+                // Per-attempt timeout — innermost strategy
+                builder.AddTimeout(TimeSpan.FromSeconds(opts.TimeoutSeconds));
+            });
 
         return services;
     }
