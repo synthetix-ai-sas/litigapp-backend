@@ -13,10 +13,10 @@ public class CourtConfiguration : IEntityTypeConfiguration<Court>
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).HasColumnType("uuid");
 
-        builder.Property(c => c.OfficialCode).IsRequired().HasColumnType("char(12)");
-        builder.Property(c => c.CityId).IsRequired().HasColumnType("integer");
-        builder.Property(c => c.EntityId).HasColumnType("smallint");
-        builder.Property(c => c.SpecialtyId).HasColumnType("smallint");
+        builder.Property(c => c.OfficialCode).IsRequired().HasColumnType("char(12)").IsFixedLength();
+        builder.Property(c => c.CityId).IsRequired().HasColumnType("char(5)").IsFixedLength();
+        builder.Property(c => c.EntityCode).HasColumnType("char(2)").IsFixedLength();
+        builder.Property(c => c.SpecialtyCode).HasColumnType("char(2)").IsFixedLength();
         builder.Property(c => c.CourtNumber).HasColumnType("smallint");
         builder.Property(c => c.Name).IsRequired().HasColumnType("text");
         builder.Property(c => c.IsActive).HasColumnType("boolean").HasDefaultValue(true);
@@ -30,7 +30,7 @@ public class CourtConfiguration : IEntityTypeConfiguration<Court>
             .HasDatabaseName("ix_courts_official_code");
 
         // Composite index city + specialty
-        builder.HasIndex(c => new { c.CityId, c.SpecialtyId })
+        builder.HasIndex(c => new { c.CityId, c.SpecialtyCode })
             .HasDatabaseName("idx_courts_city_spec");
 
         // GIN trigram index on name (requires pg_trgm extension)
@@ -48,12 +48,12 @@ public class CourtConfiguration : IEntityTypeConfiguration<Court>
 
         builder.HasOne(c => c.JudicialEntity)
             .WithMany(e => e.Courts)
-            .HasForeignKey(c => c.EntityId)
+            .HasForeignKey(c => c.EntityCode)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(c => c.Specialty)
             .WithMany(s => s.Courts)
-            .HasForeignKey(c => c.SpecialtyId)
+            .HasForeignKey(c => c.SpecialtyCode)
             .OnDelete(DeleteBehavior.SetNull);
     }
 }
