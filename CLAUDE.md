@@ -90,15 +90,69 @@ Utiliza las herramientas MCP de Roslyn Navigator en lugar de leer los archivos f
 
 **Regla:** Prueba siempre primero una herramienta de Roslyn Navigator. Recurre a `Read` solo si la herramienta no devuelve suficientes detalles (por ejemplo, si necesitas el cuerpo completo del método).
 
-### dotnet toolkit
-Consulta el dotnet toolkit cuando:
-- Diseñas un nuevo handler CQRS, repositorio o configuration EF.
-- Aplicas patterns de Polly, Hangfire, ASP.NET Core Identity, JWT, Loggin, Api versioning, Session Management.
-- Estructuras un nuevo csproj o feature folder, DDD, docker.
+### Skills de dotnet-toolkit a usar SIEMPRE
 
-Si el toolkit sugiere algo distinto al blueprint, EL BLUEPRINT MANDA.
-El toolkit es referencia genérica; el blueprint es decisión específica
-de este proyecto.
+Estas skills definen patterns que TODOS los devs deben seguir en este
+proyecto. No son opcionales:
+
+- `dotnet-toolkit:minimal-api` — TODOS los endpoints son Minimal APIs con
+  MapGroup. NO se usan controllers MVC. Patrón: clase estática
+  `XxxEndpoints` con método `MapXxxEndpoints(IEndpointRouteBuilder)`
+  registrada en Program.cs.
+
+- `dotnet-toolkit:openapi` — OpenAPI nativo de .NET 10 (`AddOpenApi` +
+  `MapOpenApi`). NO Swashbuckle. Documentar con `.WithName()`,
+  `.WithSummary()`, `.WithTags()`, `.Produces<T>()`.
+
+- `dotnet-toolkit:error-handling` — Result<T> pattern en handlers
+  + ProblemDetails (RFC 9457) en endpoints. `TypedResults.Problem(...)`
+  o handler global de excepciones. NO throw para errores esperables.
+
+- `dotnet-toolkit:serilog` + `dotnet-toolkit:logging` — Serilog config
+  + Request Logging middleware en Program.cs + LoggingBehavior CQRS
+  para Commands. Queries simples NO requieren log por hit.
+
+- `dotnet-toolkit:ef-core` — patterns de EF Core 10. AsNoTracking en
+  reads, value converters para VOs cuando se introduzcan, compiled
+  queries para hot paths del sync engine.
+
+- `dotnet-toolkit:resilience` + `dotnet-toolkit:httpclient-factory` —
+  TODOS los HttpClients (Rama Judicial, Resend, futuros) van por
+  IHttpClientFactory con Microsoft.Extensions.Http.Resilience.
+  Polly v8 underneath.
+
+- `dotnet-toolkit:testing` — xUnit v3 + WebApplicationFactory +
+  Testcontainers Postgres real para integration tests. Verify para
+  snapshot testing de payloads complejos (digest emails, PDF, etc.).
+
+- `dotnet-toolkit:configuration` — Options pattern con IOptionsSnapshot
+  para todo lo configurable (Jwt, RamaJudicial, Sweep, Throttle, etc.).
+  Validación de Options con `.ValidateDataAnnotations().ValidateOnStart()`.
+
+- `dotnet-toolkit:modern-csharp` — C# 14 features cuando aporten:
+  primary constructors, collection expressions, pattern matching
+  exhaustivo. Records para DTOs y VOs.
+
+- `dotnet-toolkit:clean-architecture` — referencia del patrón. El
+  blueprint manda en discrepancias específicas de LitigApp.
+
+### Skills de dotnet-toolkit para usar a demanda
+
+- `dotnet-toolkit:scaffold` o `dotnet-toolkit:scaffolding` — al crear
+  un feature slice nuevo.
+- `dotnet-toolkit:tdd` — para implementar lógica crítica (sync engine,
+  parsers, handlers no triviales).
+- `dotnet-toolkit:plan` — antes de codear features de 3+ steps.
+- `dotnet-toolkit:verify` — antes de abrir PR (7 fases: build,
+  analyzers, antipatterns, tests, security, format, diff).
+- `dotnet-toolkit:de-sloppify` — pasada de limpieza antes de PR.
+- `dotnet-toolkit:code-review` — review propio antes de pedir review
+  humana.
+- `dotnet-toolkit:migrate` o `dotnet-toolkit:migration-workflow` — al
+  agregar migraciones EF.
+- `dotnet-toolkit:build-fix` — si el build se rompe en cascada.
+- `dotnet-toolkit:health-check` — periódicamente para auditar calidad.
+- `dotnet-toolkit:security-scan` — antes de cada deploy a producción.
 
 ### Skills de gstack relevantes para este proyecto
 - `/autoplan` — antes de codear features complejas (sync engine, imports).
