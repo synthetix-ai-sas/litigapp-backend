@@ -1,7 +1,3 @@
-using LitigApp.Application.Catalog.Queries.ListCitiesByDepartment;
-using LitigApp.Application.Catalog.Queries.ListDepartments;
-using LitigApp.Application.Common;
-using LitigApp.Infrastructure.Catalog;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -39,10 +35,6 @@ public static class DependencyInjection
             })
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders();
-
-        // Catalog query handlers
-        services.AddScoped<IQueryHandler<ListDepartmentsQuery, List<DepartmentDto>>, ListDepartmentsHandler>();
-        services.AddScoped<IQueryHandler<ListCitiesByDepartmentQuery, List<CityDto>>, ListCitiesByDepartmentHandler>();
 
         return services;
     }

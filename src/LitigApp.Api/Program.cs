@@ -1,4 +1,3 @@
-using LitigApp.Api.Features.Catalog;
 using LitigApp.Infrastructure;
 using LitigApp.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,8 +21,6 @@ if (args.Contains("seed-catalog"))
 app.UseHttpsRedirection();
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
-
-app.MapCatalogEndpoints();
 
 app.Run();
 
