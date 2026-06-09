@@ -22,7 +22,7 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
     private void SetAuthHeader()
     {
         _client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", _factory.GenerateTestToken());
+            new AuthenticationHeaderValue("Bearer", ApiFactory.GenerateTestToken());
     }
 
     // ── GET /api/v1/catalog/departments ──────────────────────────────────

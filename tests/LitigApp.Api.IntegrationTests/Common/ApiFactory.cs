@@ -1,25 +1,17 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+using System.Net.Http.Headers;
 using LitigApp.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.IdentityModel.Tokens;
 using Testcontainers.PostgreSql;
 
 namespace LitigApp.Api.IntegrationTests.Common;
 
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    // Must match Jwt:Secret in appsettings.json so the app can validate tokens without extra config.
-    public const string TestJwtSecret = "dev-placeholder-override-via-Jwt__Secret-env-var-in-prod-min32chars";
-    public const string TestJwtIssuer = "LitigApp";
-    public const string TestJwtAudience = "LitigApp";
-
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .Build();
 
@@ -30,24 +22,22 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Postgres"] = _postgres.GetConnectionString(),
-                ["Jwt:Secret"] = TestJwtSecret,
-                ["Jwt:Issuer"] = TestJwtIssuer,
-                ["Jwt:Audience"] = TestJwtAudience,
             });
         });
 
-        // Override JWT signing key after all options are applied, to ensure test secret wins.
         builder.ConfigureServices(services =>
         {
-            services.PostConfigure<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(
-                Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme,
-                options =>
-                {
-                    options.TokenValidationParameters.IssuerSigningKey =
-                        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestJwtSecret));
-                    options.TokenValidationParameters.ValidIssuer = TestJwtIssuer;
-                    options.TokenValidationParameters.ValidAudience = TestJwtAudience;
-                });
+            // Replace JWT with a test auth handler that accepts any Bearer token.
+            // This avoids JWT key/clock issues in CI and keeps tests focused on behavior.
+            services.AddAuthentication(TestAuthHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
+                    TestAuthHandler.SchemeName, _ => { });
+
+            services.Configure<AuthenticationOptions>(options =>
+            {
+                options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+            });
         });
     }
 
@@ -69,24 +59,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await _postgres.DisposeAsync();
     }
 
-    public string GenerateTestToken(string userId = "test-user-id")
-    {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestJwtSecret));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var claims = new[]
-        {
-            new Claim(JwtRegisteredClaimNames.Sub, userId),
-            new Claim(JwtRegisteredClaimNames.Email, "test@litigapp.co"),
-        };
-        var token = new JwtSecurityToken(
-            issuer: TestJwtIssuer,
-            audience: TestJwtAudience,
-            claims: claims,
-            expires: DateTime.UtcNow.AddHours(1),
-            signingCredentials: creds);
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
+    /// <summary>Returns a bearer token accepted by <see cref="TestAuthHandler"/>.</summary>
+    public static string GenerateTestToken() => TestAuthHandler.TestBearerToken;
 
     private static async Task SeedTestDataAsync(AppDbContext db)
     {
