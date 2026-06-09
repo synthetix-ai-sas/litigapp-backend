@@ -1,4 +1,5 @@
 using System.Text;
+using LitigApp.Api.Features.Catalog;
 using LitigApp.Application;
 using LitigApp.Infrastructure;
 using LitigApp.Infrastructure.Persistence;
@@ -30,7 +31,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
-builder.Services.AddControllers();
 
 var app = builder.Build();
 
@@ -47,7 +47,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
-app.MapControllers();
+app.MapCatalogEndpoints();
 
 app.Run();
 
