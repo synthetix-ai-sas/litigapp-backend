@@ -42,10 +42,9 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
-        var data = doc.GetProperty("data");
-        data.GetArrayLength().Should().Be(3);
-        data.EnumerateArray().Should().Contain(e => e.GetProperty("name").GetString() == "Caldas");
+        var data = JsonSerializer.Deserialize<JsonElement[]>(json, JsonOpts)!;
+        data.Length.Should().Be(3);
+        data.Should().Contain(e => e.GetProperty("name").GetString() == "Caldas");
     }
 
     // ── GET /api/v1/catalog/departments/{id}/cities ──────────────────────
@@ -65,10 +64,9 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
-        var data = doc.GetProperty("data");
-        data.GetArrayLength().Should().Be(2);
-        data.EnumerateArray().Should().Contain(e => e.GetProperty("name").GetString() == "Manizales");
+        var data = JsonSerializer.Deserialize<JsonElement[]>(json, JsonOpts)!;
+        data.Length.Should().Be(2);
+        data.Should().Contain(e => e.GetProperty("name").GetString() == "Manizales");
     }
 
     [Fact]
@@ -79,8 +77,8 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
-        doc.GetProperty("data").GetArrayLength().Should().Be(0);
+        var data = JsonSerializer.Deserialize<JsonElement[]>(json, JsonOpts)!;
+        data.Length.Should().Be(0);
     }
 
     // ── GET /api/v1/catalog/specialties ─────────────────────────────────
@@ -100,8 +98,8 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
-        doc.GetProperty("data").GetArrayLength().Should().Be(2);
+        var data = JsonSerializer.Deserialize<JsonElement[]>(json, JsonOpts)!;
+        data.Length.Should().Be(2);
     }
 
     // ── GET /api/v1/catalog/entities ────────────────────────────────────
@@ -121,8 +119,8 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
-        doc.GetProperty("data").GetArrayLength().Should().Be(2);
+        var data = JsonSerializer.Deserialize<JsonElement[]>(json, JsonOpts)!;
+        data.Length.Should().Be(2);
     }
 
     // ── GET /api/v1/catalog/cities/{cityId}/courts ───────────────────────
@@ -142,11 +140,10 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
         // Pereira has 4 courts but 1 is inactive → 3 civil + 1 laboral = 4 active
-        var data = doc.GetProperty("data");
-        data.GetArrayLength().Should().Be(4);
-        data.EnumerateArray().Should().NotContain(e =>
+        var data = JsonSerializer.Deserialize<JsonElement[]>(json, JsonOpts)!;
+        data.Length.Should().Be(4);
+        data.Should().NotContain(e =>
             e.GetProperty("name").GetString()!.Contains("004") &&
             e.GetProperty("name").GetString()!.Contains("PEREIRA"));
     }
@@ -159,9 +156,8 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
-        var data = doc.GetProperty("data");
-        data.GetArrayLength().Should().Be(2); // only civil courts in Manizales
+        var data = JsonSerializer.Deserialize<JsonElement[]>(json, JsonOpts)!;
+        data.Length.Should().Be(2); // only civil courts in Manizales
     }
 
     [Fact]
@@ -172,8 +168,8 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
-        doc.GetProperty("data").GetArrayLength().Should().Be(0);
+        var data = JsonSerializer.Deserialize<JsonElement[]>(json, JsonOpts)!;
+        data.Length.Should().Be(0);
     }
 
     // ── GET /api/v1/catalog/courts/search ────────────────────────────────
@@ -201,9 +197,9 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
+        var data = JsonSerializer.Deserialize<JsonElement[]>(json, JsonOpts)!;
         // All civil municipal courts across all cities
-        doc.GetProperty("data").GetArrayLength().Should().BeGreaterThan(0);
+        data.Length.Should().BeGreaterThan(0);
     }
 
     [Fact]
@@ -214,9 +210,8 @@ public sealed class CatalogEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
-        var data = doc.GetProperty("data");
-        data.EnumerateArray().Should().OnlyContain(e =>
+        var data = JsonSerializer.Deserialize<JsonElement[]>(json, JsonOpts)!;
+        data.Should().OnlyContain(e =>
             e.GetProperty("name").GetString()!.Contains("MANIZALES"));
     }
 }
