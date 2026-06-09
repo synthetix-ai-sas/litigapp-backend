@@ -6,7 +6,8 @@ using LitigApp.Application.Features.Catalog.Queries.ListDepartments;
 using LitigApp.Application.Features.Catalog.Queries.ListEntities;
 using LitigApp.Application.Features.Catalog.Queries.ListSpecialties;
 using LitigApp.Application.Features.Catalog.Queries.SearchCourts;
-using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LitigApp.Api.Features.Catalog;
 
@@ -15,7 +16,10 @@ public static class CatalogEndpoints
     public static IEndpointRouteBuilder MapCatalogEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/catalog")
-            .RequireAuthorization()
+            .RequireAuthorization(new AuthorizeAttribute
+            {
+                AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme
+            })
             .WithTags("Catalog");
 
         group.MapGet("/departments", ListDepartments)
@@ -45,40 +49,40 @@ public static class CatalogEndpoints
         return app;
     }
 
-    private static async Task<Ok<List<DepartmentDto>>> ListDepartments(
+    private static async Task<IResult> ListDepartments(
         IQueryHandler<ListDepartmentsQuery, List<DepartmentDto>> handler,
         CancellationToken ct)
     {
         var result = await handler.HandleAsync(new ListDepartmentsQuery(), ct);
-        return TypedResults.Ok(result);
+        return Results.Ok(new { data = result, error = (object?)null });
     }
 
-    private static async Task<Ok<List<CityDto>>> ListCitiesByDepartment(
+    private static async Task<IResult> ListCitiesByDepartment(
         string id,
         IQueryHandler<ListCitiesByDepartmentQuery, List<CityDto>> handler,
         CancellationToken ct)
     {
         var result = await handler.HandleAsync(new ListCitiesByDepartmentQuery(id), ct);
-        return TypedResults.Ok(result);
+        return Results.Ok(new { data = result, error = (object?)null });
     }
 
-    private static async Task<Ok<List<SpecialtyDto>>> ListSpecialties(
+    private static async Task<IResult> ListSpecialties(
         IQueryHandler<ListSpecialtiesQuery, List<SpecialtyDto>> handler,
         CancellationToken ct)
     {
         var result = await handler.HandleAsync(new ListSpecialtiesQuery(), ct);
-        return TypedResults.Ok(result);
+        return Results.Ok(new { data = result, error = (object?)null });
     }
 
-    private static async Task<Ok<List<EntityDto>>> ListEntities(
+    private static async Task<IResult> ListEntities(
         IQueryHandler<ListEntitiesQuery, List<EntityDto>> handler,
         CancellationToken ct)
     {
         var result = await handler.HandleAsync(new ListEntitiesQuery(), ct);
-        return TypedResults.Ok(result);
+        return Results.Ok(new { data = result, error = (object?)null });
     }
 
-    private static async Task<Ok<List<CourtDto>>> ListCourtsByCity(
+    private static async Task<IResult> ListCourtsByCity(
         string cityId,
         IQueryHandler<ListCourtsByCityQuery, List<CourtDto>> handler,
         CancellationToken ct,
@@ -86,19 +90,19 @@ public static class CatalogEndpoints
         string? entityCode = null)
     {
         var result = await handler.HandleAsync(new ListCourtsByCityQuery(cityId, specialtyCode, entityCode), ct);
-        return TypedResults.Ok(result);
+        return Results.Ok(new { data = result, error = (object?)null });
     }
 
-    private static async Task<Results<Ok<List<CourtDto>>, BadRequest<string>>> SearchCourts(
+    private static async Task<IResult> SearchCourts(
         IQueryHandler<SearchCourtsQuery, List<CourtDto>> handler,
         CancellationToken ct,
         string? name = null,
         string? cityId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
-            return TypedResults.BadRequest("El parámetro 'name' es requerido.");
+            return Results.BadRequest(new { data = (object?)null, error = new { code = "VALIDATION", message = "El parámetro 'name' es requerido." } });
 
         var result = await handler.HandleAsync(new SearchCourtsQuery(name, cityId), ct);
-        return TypedResults.Ok(result);
+        return Results.Ok(new { data = result, error = (object?)null });
     }
 }
