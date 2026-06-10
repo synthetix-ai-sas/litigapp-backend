@@ -1,6 +1,8 @@
 using System.Net;
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
+using LitigApp.Application.Common.Abstractions;
+using LitigApp.Infrastructure.Catalog;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Infrastructure.Time;
@@ -94,6 +96,9 @@ public static class DependencyInjection
                 // Per-attempt timeout — innermost strategy
                 builder.AddTimeout(TimeSpan.FromSeconds(opts.TimeoutSeconds));
             });
+        // Catalog
+        services.AddMemoryCache();
+        services.AddScoped<ICatalogReader, CachedCatalogReader>();
 
         return services;
     }
