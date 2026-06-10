@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LitigApp.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260602164953_Initial")]
+    [Migration("20260604140948_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -27,13 +27,16 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("LitigApp.Domain.Catalog.City", b =>
                 {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
+                    b.Property<string>("Id")
+                        .HasColumnType("char(5)")
+                        .HasColumnName("id")
+                        .IsFixedLength();
 
-                    b.Property<short>("DepartmentId")
-                        .HasColumnType("smallint")
-                        .HasColumnName("department_id");
+                    b.Property<string>("DepartmentId")
+                        .IsRequired()
+                        .HasColumnType("char(2)")
+                        .HasColumnName("department_id")
+                        .IsFixedLength();
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -56,9 +59,11 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<int>("CityId")
-                        .HasColumnType("integer")
-                        .HasColumnName("city_id");
+                    b.Property<string>("CityId")
+                        .IsRequired()
+                        .HasColumnType("char(5)")
+                        .HasColumnName("city_id")
+                        .IsFixedLength();
 
                     b.Property<short?>("CourtNumber")
                         .HasColumnType("smallint")
@@ -68,9 +73,10 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamptz")
                         .HasColumnName("created_at");
 
-                    b.Property<short?>("EntityId")
-                        .HasColumnType("smallint")
-                        .HasColumnName("entity_id");
+                    b.Property<string>("EntityCode")
+                        .HasColumnType("char(2)")
+                        .HasColumnName("entity_code")
+                        .IsFixedLength();
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -90,21 +96,23 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                     b.Property<string>("OfficialCode")
                         .IsRequired()
                         .HasColumnType("char(12)")
-                        .HasColumnName("official_code");
+                        .HasColumnName("official_code")
+                        .IsFixedLength();
 
                     b.Property<string>("RawPayload")
                         .HasColumnType("jsonb")
                         .HasColumnName("raw_payload");
 
-                    b.Property<short?>("SpecialtyId")
-                        .HasColumnType("smallint")
-                        .HasColumnName("specialty_id");
+                    b.Property<string>("SpecialtyCode")
+                        .HasColumnType("char(2)")
+                        .HasColumnName("specialty_code")
+                        .IsFixedLength();
 
                     b.HasKey("Id")
                         .HasName("pk_courts");
 
-                    b.HasIndex("EntityId")
-                        .HasDatabaseName("ix_courts_entity_id");
+                    b.HasIndex("EntityCode")
+                        .HasDatabaseName("ix_courts_entity_code");
 
                     b.HasIndex("Name")
                         .HasDatabaseName("idx_courts_name_trgm");
@@ -116,10 +124,10 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_courts_official_code");
 
-                    b.HasIndex("SpecialtyId")
-                        .HasDatabaseName("ix_courts_specialty_id");
+                    b.HasIndex("SpecialtyCode")
+                        .HasDatabaseName("ix_courts_specialty_code");
 
-                    b.HasIndex("CityId", "SpecialtyId")
+                    b.HasIndex("CityId", "SpecialtyCode")
                         .HasDatabaseName("idx_courts_city_spec");
 
                     b.ToTable("courts", (string)null);
@@ -127,9 +135,10 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("LitigApp.Domain.Catalog.Department", b =>
                 {
-                    b.Property<short>("Id")
-                        .HasColumnType("smallint")
-                        .HasColumnName("id");
+                    b.Property<string>("Id")
+                        .HasColumnType("char(2)")
+                        .HasColumnName("id")
+                        .IsFixedLength();
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -144,52 +153,36 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("LitigApp.Domain.Catalog.Entity", b =>
                 {
-                    b.Property<short>("Id")
-                        .HasColumnType("smallint")
-                        .HasColumnName("id");
-
                     b.Property<string>("Code")
-                        .IsRequired()
                         .HasColumnType("char(2)")
-                        .HasColumnName("code");
+                        .HasColumnName("code")
+                        .IsFixedLength();
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
 
-                    b.HasKey("Id")
+                    b.HasKey("Code")
                         .HasName("pk_entities");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasDatabaseName("ix_entities_code");
 
                     b.ToTable("entities", (string)null);
                 });
 
             modelBuilder.Entity("LitigApp.Domain.Catalog.Specialty", b =>
                 {
-                    b.Property<short>("Id")
-                        .HasColumnType("smallint")
-                        .HasColumnName("id");
-
                     b.Property<string>("Code")
-                        .IsRequired()
                         .HasColumnType("char(2)")
-                        .HasColumnName("code");
+                        .HasColumnName("code")
+                        .IsFixedLength();
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
 
-                    b.HasKey("Id")
+                    b.HasKey("Code")
                         .HasName("pk_specialties");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasDatabaseName("ix_specialties_code");
 
                     b.ToTable("specialties", (string)null);
                 });
@@ -1043,15 +1036,15 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
 
                     b.HasOne("LitigApp.Domain.Catalog.Entity", "JudicialEntity")
                         .WithMany("Courts")
-                        .HasForeignKey("EntityId")
+                        .HasForeignKey("EntityCode")
                         .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_courts_entities_entity_id");
+                        .HasConstraintName("fk_courts_entities_entity_code");
 
                     b.HasOne("LitigApp.Domain.Catalog.Specialty", "Specialty")
                         .WithMany("Courts")
-                        .HasForeignKey("SpecialtyId")
+                        .HasForeignKey("SpecialtyCode")
                         .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_courts_specialties_specialty_id");
+                        .HasConstraintName("fk_courts_specialties_specialty_code");
 
                     b.Navigation("City");
 

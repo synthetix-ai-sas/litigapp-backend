@@ -286,14 +286,14 @@ litigapp-backend/
 │   │   └── DependencyInjection.cs              # AddJobs(IConfiguration)
 │   │
 │   └── LitigApp.Api/                           # csproj — referencia: Application, Infrastructure, Jobs
-│       ├── Features/                           # controllers por feature
-│       │   ├── Auth/AuthController.cs
-│       │   ├── Processes/ProcessesController.cs
-│       │   ├── Catalog/CatalogController.cs
-│       │   ├── Imports/ImportsController.cs
-│       │   ├── Notifications/NotificationsController.cs
-│       │   ├── Pdf/PdfController.cs
-│       │   └── Health/HealthController.cs
+│       ├── Features/                           # endpoints por feature (Minimal APIs con MapGroup)
+│       │   ├── Auth/AuthEndpoints.cs           # MapGroup("/api/v1/auth")
+│       │   ├── Processes/ProcessesEndpoints.cs # MapGroup("/api/v1/processes")
+│       │   ├── Catalog/CatalogEndpoints.cs     # MapGroup("/api/v1/catalog")
+│       │   ├── Imports/ImportsEndpoints.cs
+│       │   ├── Notifications/NotificationsEndpoints.cs
+│       │   ├── Pdf/PdfEndpoints.cs
+│       │   └── Health/HealthEndpoints.cs
 │       ├── Middleware/
 │       │   ├── ExceptionHandlingMiddleware.cs
 │       │   └── RequestLoggingMiddleware.cs
@@ -913,11 +913,44 @@ public sealed record FileNumber
 ## 5. API Design (Endpoints REST)
 
 Convenciones:
+- **Patrón**: Minimal APIs de .NET 10 (NO controllers MVC). Cada feature expone una clase estática `XxxEndpoints` con un método de extensión `MapXxxEndpoints(IEndpointRouteBuilder)` que usa `MapGroup` para agrupar rutas. Ver dotnet-toolkit:minimal-api skill.
+- **Resultados**: usar `TypedResults` (no `IActionResult`). Permite OpenAPI más precisa y mejor testabilidad.
+- **OpenAPI**: nativo de .NET 10 (`AddOpenApi()` + `MapOpenApi()`). NO Swashbuckle. Ver dotnet-toolkit:openapi skill.
+- **Errores**: ProblemDetails (RFC 9457) vía `TypedResults.Problem(...)` o handler global. Ver dotnet-toolkit:error-handling skill.
+- **Validación**: FluentValidation invocado en filters de endpoint o en handler. 400 con ProblemDetails de tipo `validation`.
 - Base path: `/api/v1`
-- Auth: JWT Bearer en `Authorization: Bearer <token>` para todo excepto `/auth/*` y `/health`
-- Respuestas siguen formato `{ data: T, error: null }` o `{ data: null, error: { code, message, details? } }`
+- Auth: JWT Bearer en `Authorization: Bearer <token>` para todo excepto `/auth/*` y `/health`. Aplicar con `.RequireAuthorization()` en el `MapGroup`.
 - Paginación: `?page=1&pageSize=20` con respuesta `{ items, total, page, pageSize, totalPages }`
-- Validación: 400 con `error.code = 'VALIDATION'` y `error.details = { fieldName: ['msg'] }`
+
+**Patrón de endpoint** (ejemplo):
+
+```csharp
+public static class CatalogEndpoints
+{
+    public static IEndpointRouteBuilder MapCatalogEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/v1/catalog")
+            .RequireAuthorization()
+            .WithTags("Catalog");
+
+        group.MapGet("/departments", ListDepartments)
+            .WithName("ListDepartments")
+            .WithSummary("Lista todos los departamentos");
+
+        return app;
+    }
+
+    private static async Task<Ok<List<DepartmentDto>>> ListDepartments(
+        IQueryHandler<ListDepartmentsQuery, List<DepartmentDto>> handler,
+        CancellationToken ct)
+    {
+        var result = await handler.Handle(new ListDepartmentsQuery(), ct);
+        return TypedResults.Ok(result.Value);
+    }
+}
+```
+
+En `Program.cs`: `app.MapAuthEndpoints().MapCatalogEndpoints().MapProcessesEndpoints()...`
 
 ### Routes Overview
 
@@ -1961,6 +1994,103 @@ public async Task RunAsync(string userId, CancellationToken ct)
 - **Outbox sigue siendo durable**: si Resend falla, queda `status='pending'` y el `NotificationFallbackSweepJob` (cada 1h) lo recoge.
 - Idempotencia: si el job se reintenta, los UNIQUE constraints en `process_actions(external_action_id)` evitan duplicar actuaciones, y la query `GetChangedSinceAsync` desde `lastNotifiedAt` evita reenvíos duplicados.
 
+### 10.3.1 Observabilidad y logging (cross-cutting concerns)
+
+**Stack**: Serilog (logs estructurados) + OpenTelemetry (traces y métricas) + ASP.NET Core Health Checks. Ver dotnet-toolkit:serilog, dotnet-toolkit:opentelemetry y dotnet-toolkit:logging skills para patterns idiomáticos.
+
+**Configuración base en `Program.cs`** (parte de la infraestructura inicial, propiedad de la vertical Cuenta + Infra):
+
+```csharp
+// Bootstrap Serilog antes de construir el host
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithEnvironmentName()
+    .CreateBootstrapLogger();
+
+builder.Host.UseSerilog((ctx, services, cfg) => cfg
+    .ReadFrom.Configuration(ctx.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext());
+
+// Request logging middleware
+app.UseSerilogRequestLogging(opts =>
+{
+    opts.MessageTemplate = "HTTP {RequestMethod} {RequestPath} → {StatusCode} in {Elapsed:0.0000} ms";
+    opts.GetLevel = (httpCtx, elapsed, ex) => ex != null
+        ? LogEventLevel.Error
+        : httpCtx.Response.StatusCode > 499
+            ? LogEventLevel.Error
+            : elapsed > 1000 ? LogEventLevel.Warning : LogEventLevel.Information;
+});
+```
+
+**LoggingBehavior** (cross-cutting que envuelve TODOS los handlers CQRS):
+
+```csharp
+// LitigApp.Application/Common/Behaviors/LoggingBehavior.cs
+public sealed class LoggingBehavior<TCommand, TResponse>(ILogger<LoggingBehavior<TCommand, TResponse>> logger)
+    where TCommand : ICommand<TResponse>
+{
+    public async Task<Result<TResponse>> Handle(
+        TCommand command,
+        Func<Task<Result<TResponse>>> next,
+        CancellationToken ct)
+    {
+        var requestName = typeof(TCommand).Name;
+        var sw = Stopwatch.StartNew();
+        logger.LogDebug("Handling {RequestName}", requestName);
+        try
+        {
+            var result = await next();
+            sw.Stop();
+            if (result.IsSuccess)
+                logger.LogInformation("Handled {RequestName} in {Elapsed}ms", requestName, sw.ElapsedMilliseconds);
+            else
+                logger.LogWarning("Handled {RequestName} with error {Error} in {Elapsed}ms",
+                    requestName, result.Error, sw.ElapsedMilliseconds);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            logger.LogError(ex, "Exception handling {RequestName} after {Elapsed}ms",
+                requestName, sw.ElapsedMilliseconds);
+            throw;
+        }
+    }
+}
+```
+
+Registrado vía Decorator en DI. Aplica a Commands automáticamente; los Queries lo pueden saltar (mucho ruido).
+
+**Logging por capa**:
+
+| Capa | Qué loggea | Nivel típico |
+|---|---|---|
+| Request middleware (Serilog) | HTTP method, path, status, duración | Information / Warning / Error |
+| LoggingBehavior (Commands) | Handler in/out + duración + Result | Debug / Information / Warning |
+| Handlers (Queries simples) | Nada de rutina | Debug solo en cache hit/miss |
+| Handlers (Commands complejos) | Business events específicos | Information |
+| External clients (Rama Judicial) | Request, response, retries, WAF 403, cooldowns | Information / Warning / Error |
+| Jobs Hangfire | Inicio/fin, count procesados, errores | Information / Warning / Error |
+| Infrastructure errors | Excepciones inesperadas | Error con stack trace |
+
+**Anti-patterns prohibidos**:
+- `_logger.LogInformation` en cada handler de Query rutinaria — se vuelve ruido.
+- `string.Format` o interpolación en mensajes de log — usar template + parámetros estructurados.
+- Loggear PII (passwords, tokens, datos personales completos del abogado).
+- Log + throw del mismo error en niveles distintos (loggea solo donde manejas).
+
+**Sinks**:
+- Dev local: `Console` + opcionalmente `Seq` (`http://localhost:5341` en docker-compose).
+- Producción: `Console` (Railway lo captura) + `BetterStack` o `Logtail` con structured fields.
+
+**OpenTelemetry** (Tier 1+):
+- ActivitySource custom para sync engine y outbox dispatcher.
+- Metrics: `litigapp.sync.processes_synced`, `litigapp.sync.waf_blocks`, `litigapp.notifications.sent`, `litigapp.api.rama_judicial.duration`.
+- Export OTLP cuando lleguemos a Tier 1 (Aspire Dashboard local, BetterStack o Honeycomb en prod).
+
 ### 10.4 Templates de notificación (formato DIGEST — solo EMAIL en MVP)
 
 **Email digest (Resend) — `UserDigestEmailTemplate.cs`**:
@@ -2072,7 +2202,10 @@ Las plantillas WhatsApp deben ser **registradas y aprobadas en Meta Business Man
 
 ```bash
 # Crear solución y proyectos
-dotnet new sln -n LitigApp
+# NOTA: --format sln fuerza el formato clásico .sln en lugar del nuevo .slnx
+# (default en .NET 10 SDK). .slnx no es reconocido por VS 2022 < 17.13.
+# Mantenemos .sln clásico para compatibilidad con el equipo.
+dotnet new sln -n LitigApp --format sln
 dotnet new classlib -n LitigApp.Domain -o src/LitigApp.Domain
 dotnet new classlib -n LitigApp.Application -o src/LitigApp.Application
 dotnet new classlib -n LitigApp.Infrastructure -o src/LitigApp.Infrastructure
@@ -2846,7 +2979,7 @@ ASP.NET Core 10 (.NET 10 LTS, C# 14) + EF Core 10 + PostgreSQL 16 + Hangfire + J
 - `Application` — handlers CQRS (sin MediatR — handlers propios), validators, contratos.
 - `Infrastructure` — EF Core, Identity, clientes externos (Rama Judicial, Resend, Meta), QuestPDF, ClosedXML.
 - `Jobs` — Hangfire jobs: HotSync (diario), DeepSync (encolado), NotificationDispatcher (cada 5min), InitialFetch.
-- `Api` — controllers organizados por feature, middleware, Program.cs.
+- `Api` — endpoints organizados por feature (Minimal APIs con MapGroup), middleware, Program.cs.
 
 Reglas: Domain ← nada. Application ← Domain. Infrastructure ← App+Dom. Jobs ← App+Infra+Dom. Api ← todos.
 

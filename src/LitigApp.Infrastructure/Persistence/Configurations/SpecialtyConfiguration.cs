@@ -10,13 +10,8 @@ public class SpecialtyConfiguration : IEntityTypeConfiguration<Specialty>
     {
         builder.ToTable("specialties");
 
-        builder.HasKey(s => s.Id);
-        builder.Property(s => s.Id).HasColumnType("smallint").ValueGeneratedNever();
-        builder.Property(s => s.Code).IsRequired().HasColumnType("char(2)");
+        builder.HasKey(s => s.Code);
+        builder.Property(s => s.Code).HasColumnType("char(2)").IsFixedLength().ValueGeneratedNever();
         builder.Property(s => s.Name).IsRequired().HasColumnType("text");
-
-        builder.HasIndex(s => s.Code)
-            .IsUnique()
-            .HasDatabaseName("ix_specialties_code");
     }
 }

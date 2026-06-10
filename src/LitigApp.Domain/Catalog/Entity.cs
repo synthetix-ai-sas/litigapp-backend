@@ -1,13 +1,11 @@
 namespace LitigApp.Domain.Catalog;
 
 /// <summary>
-/// Entidad judicial (e.g. Id=71, Code="71", Name="CENTRO DE SERVICIOS JUDICIALES").
+/// Entidad judicial (e.g. Code="71", Name="CENTRO DE SERVICIOS JUDICIALES").
 /// </summary>
 public class Entity
 {
-    public short Id { get; set; }
-
-    /// <summary>Two-character code (char(2)).</summary>
+    /// <summary>Natural primary key — two-character DANE code (char(2), e.g. "71").</summary>
     public string Code { get; set; } = string.Empty;
 
     public string Name { get; set; } = string.Empty;
