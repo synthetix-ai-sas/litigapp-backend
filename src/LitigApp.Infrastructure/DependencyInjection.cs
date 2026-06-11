@@ -1,8 +1,7 @@
 using System.Net;
 using LitigApp.Application.Common.Abstractions;
-using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
-using LitigApp.Application.Common.Abstractions;
 using LitigApp.Infrastructure.Catalog;
+using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Infrastructure.Time;
