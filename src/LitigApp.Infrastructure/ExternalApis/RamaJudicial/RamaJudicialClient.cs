@@ -85,18 +85,18 @@ internal sealed class RamaJudicialClient : IRamaJudicialClient
             var json = await response.Content.ReadAsStringAsync(ct);
             var overview = JsonSerializer.Deserialize<OverviewResponse>(json, JsonOptions);
 
-            if (overview?.Procesos is null || overview.Procesos.Count == 0)
+            if (overview?.Processes is null || overview.Processes.Count == 0)
                 return RamaResult<OverviewData?>.Ok(null);
 
-            var p = overview.Procesos[0];
+            var p = overview.Processes[0];
             return RamaResult<OverviewData?>.Ok(new OverviewData(
-                ExternalProcessId: p.IdProceso,
-                ExternalConnectionId: p.IdConexion,
-                LlaveProceso: p.LlaveProceso,
-                FechaUltimaActuacion: p.FechaUltimaActuacion,
-                Despacho: p.Despacho,
-                Departamento: p.Departamento,
-                EsPrivado: p.EsPrivado));
+                ExternalProcessId: p.ProcessId,
+                ExternalConnectionId: p.ConnectionId,
+                ProcessKey: p.ProcessKey,
+                LastActionDate: p.LastActionDate,
+                CourtName: p.CourtName,
+                Department: p.Department,
+                IsPrivate: p.IsPrivate));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -144,17 +144,17 @@ internal sealed class RamaJudicialClient : IRamaJudicialClient
                 return RamaResult<ProcessDetailData?>.Ok(null);
 
             return RamaResult<ProcessDetailData?>.Ok(new ProcessDetailData(
-                CodDespachoCompleto: detail.CodDespachoCompleto,
-                Despacho: detail.Despacho,
-                ExternalConnectionId: detail.IdConexion,
-                EsPrivado: detail.EsPrivado,
-                FechaProceso: detail.FechaProceso,
-                TipoProceso: detail.TipoProceso,
-                ClaseProceso: detail.ClaseProceso,
-                SubclaseProceso: detail.SubclaseProceso,
-                Recurso: detail.Recurso,
-                Ponente: detail.Ponente,
-                ContenidoRadicacion: detail.ContenidoRadicacion));
+                CourtFullCode: detail.CourtFullCode,
+                CourtName: detail.CourtName,
+                ExternalConnectionId: detail.ConnectionId,
+                IsPrivate: detail.IsPrivate,
+                ProcessDate: detail.ProcessDate,
+                ProcessType: detail.ProcessType,
+                ProcessClass: detail.ProcessClass,
+                ProcessSubclass: detail.ProcessSubclass,
+                Resource: detail.Resource,
+                Rapporteur: detail.Rapporteur,
+                FilingContent: detail.FilingContent));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -198,13 +198,13 @@ internal sealed class RamaJudicialClient : IRamaJudicialClient
             var json = await response.Content.ReadAsStringAsync(ct);
             var result = JsonSerializer.Deserialize<SubjectsResponse>(json, JsonOptions);
 
-            var subjects = (result?.Sujetos ?? [])
+            var subjects = (result?.Subjects ?? [])
                 .Select(s => new SubjectData(
-                    ExternalSubjectId: s.IdRegSujeto,
-                    TipoSujeto: s.TipoSujeto,
-                    EsEmplazado: s.EsEmplazado,
-                    Identificacion: s.Identificacion,
-                    NombreRazonSocial: s.NombreRazonSocial))
+                    ExternalSubjectId: s.SubjectId,
+                    SubjectType: s.SubjectType,
+                    IsServedByPublication: s.IsServedByPublication,
+                    Identification: s.Identification,
+                    FullName: s.FullName))
                 .ToList();
 
             return RamaResult<List<SubjectData>>.Ok(subjects);
@@ -259,18 +259,18 @@ internal sealed class RamaJudicialClient : IRamaJudicialClient
             var json = await response.Content.ReadAsStringAsync(ct);
             var result = JsonSerializer.Deserialize<ActionsResponse>(json, JsonOptions);
 
-            var actions = (result?.Actuaciones ?? [])
+            var actions = (result?.Actions ?? [])
                 .Select(a => new ActionData(
-                    ExternalActionId: a.IdRegActuacion,
-                    ConsActuacion: a.ConsActuacion,
-                    FechaActuacion: a.FechaActuacion,
-                    Actuacion: a.Actuacion,
-                    Anotacion: a.Anotacion,
-                    FechaInicial: a.FechaInicial,
-                    FechaFinal: a.FechaFinal,
-                    FechaRegistro: a.FechaRegistro,
-                    CodRegla: a.CodRegla?.Trim(), // Spike finding §4: trailing spaces
-                    ConDocumentos: a.ConDocumentos))
+                    ExternalActionId: a.ActionId,
+                    ActionNumber: a.ActionNumber,
+                    ActionDate: a.ActionDate,
+                    ActionType: a.ActionType,
+                    Note: a.Note,
+                    StartDate: a.StartDate,
+                    EndDate: a.EndDate,
+                    RegistrationDate: a.RegistrationDate,
+                    RuleCode: a.RuleCode?.Trim(), // Spike finding §4: trailing spaces
+                    HasDocuments: a.HasDocuments))
                 .ToList();
 
             return RamaResult<List<ActionData>>.Ok(actions);

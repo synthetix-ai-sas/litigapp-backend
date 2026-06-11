@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LitigApp.Infrastructure.ExternalApis.RamaJudicial.Dtos;
 
 /// <summary>
@@ -6,6 +8,9 @@ namespace LitigApp.Infrastructure.ExternalApis.RamaJudicial.Dtos;
 /// </summary>
 internal sealed class ApiErrorResponse
 {
+    [JsonPropertyName("message")]
     public string? Message { get; init; }
+
+    [JsonPropertyName("exceptionMessage")]
     public string? ExceptionMessage { get; init; }
 }

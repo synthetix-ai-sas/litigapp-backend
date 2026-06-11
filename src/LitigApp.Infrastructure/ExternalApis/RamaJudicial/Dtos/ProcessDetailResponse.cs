@@ -1,20 +1,47 @@
+using System.Text.Json.Serialization;
+
 namespace LitigApp.Infrastructure.ExternalApis.RamaJudicial.Dtos;
 
 internal sealed class ProcessDetailResponse
 {
-    // Spike finding §3: idRegProceso (8-digit) is distinct from idProceso (9-digit).
-    // We do NOT persist idRegProceso — external_process_id uses idProceso from overview.
-    public long IdRegProceso { get; init; }
-    public string LlaveProceso { get; init; } = "";
-    public int IdConexion { get; init; }
-    public bool EsPrivado { get; init; }
-    public DateTime? FechaProceso { get; init; }
-    public string CodDespachoCompleto { get; init; } = "";
-    public string Despacho { get; init; } = "";
-    public string? Ponente { get; init; }
-    public string? TipoProceso { get; init; }
-    public string? ClaseProceso { get; init; }
-    public string? SubclaseProceso { get; init; }
-    public string? Recurso { get; init; }
-    public string? ContenidoRadicacion { get; init; }
+    // Spike finding §3: idRegProceso (8-digit) differs from idProceso (9-digit) used as external_process_id.
+    // We do NOT persist this field — only idProceso from overview is stored.
+    [JsonPropertyName("idRegProceso")]
+    public long InternalProcessId { get; init; }
+
+    [JsonPropertyName("llaveProceso")]
+    public string ProcessKey { get; init; } = "";
+
+    [JsonPropertyName("idConexion")]
+    public int ConnectionId { get; init; }
+
+    [JsonPropertyName("esPrivado")]
+    public bool IsPrivate { get; init; }
+
+    [JsonPropertyName("fechaProceso")]
+    public DateTime? ProcessDate { get; init; }
+
+    [JsonPropertyName("codDespachoCompleto")]
+    public string CourtFullCode { get; init; } = "";
+
+    [JsonPropertyName("despacho")]
+    public string CourtName { get; init; } = "";
+
+    [JsonPropertyName("ponente")]
+    public string? Rapporteur { get; init; }
+
+    [JsonPropertyName("tipoProceso")]
+    public string? ProcessType { get; init; }
+
+    [JsonPropertyName("claseProceso")]
+    public string? ProcessClass { get; init; }
+
+    [JsonPropertyName("subclaseProceso")]
+    public string? ProcessSubclass { get; init; }
+
+    [JsonPropertyName("recurso")]
+    public string? Resource { get; init; }
+
+    [JsonPropertyName("contenidoRadicacion")]
+    public string? FilingContent { get; init; }
 }

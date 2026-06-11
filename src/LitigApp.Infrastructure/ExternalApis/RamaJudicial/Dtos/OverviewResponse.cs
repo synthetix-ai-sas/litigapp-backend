@@ -1,21 +1,43 @@
+using System.Text.Json.Serialization;
+
 namespace LitigApp.Infrastructure.ExternalApis.RamaJudicial.Dtos;
 
 internal sealed class OverviewResponse
 {
-    public string TipoConsulta { get; init; } = "";
-    public List<OverviewProcess> Procesos { get; init; } = [];
-    public Pagination Paginacion { get; init; } = new();
+    [JsonPropertyName("tipoConsulta")]
+    public string QueryType { get; init; } = "";
+
+    [JsonPropertyName("procesos")]
+    public List<OverviewProcess> Processes { get; init; } = [];
+
+    [JsonPropertyName("paginacion")]
+    public Pagination Pagination { get; init; } = new();
 }
 
 internal sealed class OverviewProcess
 {
-    public long IdProceso { get; init; }
-    public int IdConexion { get; init; }
-    public string LlaveProceso { get; init; } = "";
-    public DateTime? FechaUltimaActuacion { get; init; }
-    public string Despacho { get; init; } = "";
-    public string Departamento { get; init; } = "";
-    public bool EsPrivado { get; init; }
-    // Spike finding §4: extra field present in real API, not in blueprint DTO
-    public int CantFilas { get; init; }
+    [JsonPropertyName("idProceso")]
+    public long ProcessId { get; init; }
+
+    [JsonPropertyName("idConexion")]
+    public int ConnectionId { get; init; }
+
+    [JsonPropertyName("llaveProceso")]
+    public string ProcessKey { get; init; } = "";
+
+    [JsonPropertyName("fechaUltimaActuacion")]
+    public DateTime? LastActionDate { get; init; }
+
+    [JsonPropertyName("despacho")]
+    public string CourtName { get; init; } = "";
+
+    [JsonPropertyName("departamento")]
+    public string Department { get; init; } = "";
+
+    [JsonPropertyName("esPrivado")]
+    public bool IsPrivate { get; init; }
+
+    // Spike finding §4: extra field present in real API, always -1, ignored
+    [JsonPropertyName("cantFilas")]
+    public int RowCount { get; init; }
 }
