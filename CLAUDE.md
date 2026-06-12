@@ -66,6 +66,7 @@ Job (Hangfire) → Service (Application/Infrastructure) → `IRamaJudicialClient
 5. **async + CancellationToken** en todo I/O.
 6. **Records para DTOs** y value objects inmutables.
 7. **Migraciones EF versionadas en git**: nunca borres una aplicada.
+8. **Siempre crea ramas feature/{feature} para trabajar en el repo - NUNCA HAGAS COMMIT DIRECTO EN MAIN** 
 
 ## Herramientas disponibles en este repo
 
