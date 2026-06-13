@@ -17,26 +17,34 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
 
 // ── JWT Bearer auth ───────────────────────────────────────────────────────────
-// JwtOptions is validated at startup by AddInfrastructure via ValidateOnStart.
-// We bind again here to build TokenValidationParameters before the host starts.
-var jwtOpts = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
-    ?? throw new InvalidOperationException("Jwt configuration section is missing.");
+// AddIdentity() sets DefaultChallengeScheme to cookie (redirect). Override all three
+// so unauthenticated requests to JWT-protected endpoints get 401, not a cookie redirect.
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer();
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+// Configure JWT Bearer via IOptions<JwtOptions> (resolved post-Build) so that
+// WebApplicationFactory in-memory config overrides are picked up in tests.
+// Reading builder.Configuration here (pre-Build) would miss ConfigureWebHost overrides.
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<Microsoft.Extensions.Options.IOptions<JwtOptions>>((bearerOpts, jwtOpts) =>
     {
-        options.MapInboundClaims = false; // keep "sub" as-is, don't map to ClaimTypes.NameIdentifier
-        options.TokenValidationParameters = new TokenValidationParameters
+        bearerOpts.MapInboundClaims = false;
+        bearerOpts.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             ClockSkew = TimeSpan.Zero,
-            ValidIssuer = jwtOpts.Issuer,
-            ValidAudience = jwtOpts.Audience,
+            ValidIssuer = jwtOpts.Value.Issuer,
+            ValidAudience = jwtOpts.Value.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtOpts.Secret))
+                Encoding.UTF8.GetBytes(jwtOpts.Value.Secret))
         };
     });
 

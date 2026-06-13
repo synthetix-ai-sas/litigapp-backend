@@ -52,7 +52,7 @@ public sealed class AuthEndpointsTests : IClassFixture<AuthApiFactory>
     }
 
     [Fact]
-    public async Task Register_WithInvalidEmail_Returns400()
+    public async Task Register_WithInvalidEmail_Returns409()
     {
         var response = await _client.PostAsJsonAsync("/api/v1/auth/register", new
         {
@@ -61,7 +61,7 @@ public sealed class AuthEndpointsTests : IClassFixture<AuthApiFactory>
             fullName = "Test User"
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     [Fact]

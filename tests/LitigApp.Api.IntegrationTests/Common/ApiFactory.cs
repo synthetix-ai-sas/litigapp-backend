@@ -44,8 +44,6 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-
-        // Environment variables override appsettings.json — reliable in all .NET hosting models
         Environment.SetEnvironmentVariable("ConnectionStrings__Postgres", _postgres.GetConnectionString());
 
         using var scope = Services.CreateScope();
