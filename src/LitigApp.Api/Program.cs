@@ -1,5 +1,6 @@
 using System.Text;
 using LitigApp.Api.Auth;
+using LitigApp.Api.Features.Auth;
 using LitigApp.Api.Features.Catalog;
 using LitigApp.Api.OpenApi;
 using LitigApp.Application;
@@ -88,6 +89,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .WithName("HealthCheck")
     .WithSummary("Health check para Railway");
 
+app.MapAuthEndpoints();
 app.MapCatalogEndpoints();
 
 app.Run();

@@ -15,6 +15,9 @@ public sealed class JwtTokenService : IJwtTokenService
     public JwtTokenService(IOptions<JwtOptions> options) =>
         _options = options.Value;
 
+    public int AccessTokenExpiresInSeconds => _options.AccessTokenMinutes * 60;
+    public int RefreshTokenExpiresInDays => _options.RefreshTokenDays;
+
     public string GenerateAccessToken(string userId, string email, IEnumerable<string> roles)
     {
         var claims = new List<Claim>

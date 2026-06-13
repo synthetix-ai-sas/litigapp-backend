@@ -5,6 +5,7 @@ using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Notifications.Email;
 using LitigApp.Infrastructure.Persistence;
+using LitigApp.Infrastructure.Persistence.Repositories;
 using LitigApp.Infrastructure.Time;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -41,6 +42,8 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IEmailSender, NoOpEmailSender>();
+        services.AddScoped<IIdentityService, IdentityService>();
+        services.AddScoped<IAuthRepository, AuthRepository>();
 
         // ── ASP.NET Core Identity ─────────────────────────────────────────────
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
