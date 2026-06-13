@@ -3,6 +3,7 @@ using LitigApp.Application.Common.Abstractions;
 using LitigApp.Infrastructure.Catalog;
 using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
 using LitigApp.Infrastructure.Identity;
+using LitigApp.Infrastructure.Notifications.Email;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Infrastructure.Time;
 using Microsoft.AspNetCore.Identity;
@@ -28,6 +29,18 @@ public static class DependencyInjection
             options
                 .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention());
+
+        // ── JWT Options ───────────────────────────────────────────────────────
+        services.AddOptions<JwtOptions>()
+            .BindConfiguration(JwtOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        // ── Auth services ─────────────────────────────────────────────────────
+        services.AddHttpContextAccessor();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<IEmailSender, NoOpEmailSender>();
 
         // ── ASP.NET Core Identity ─────────────────────────────────────────────
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>

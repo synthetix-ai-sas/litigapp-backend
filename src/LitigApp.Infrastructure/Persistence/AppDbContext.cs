@@ -1,3 +1,4 @@
+using LitigApp.Domain.Auth;
 using LitigApp.Domain.Catalog;
 using LitigApp.Domain.Common;
 using LitigApp.Domain.Imports;
@@ -35,6 +36,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
     // Users
     public DbSet<UserNotificationPreferences> UserNotificationPreferences { get; set; } = null!;
+
+    // Auth
+    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
     // Sync
     public DbSet<SyncState> SyncStates { get; set; } = null!;

@@ -1,8 +1,10 @@
 using System.Text;
+using LitigApp.Api.Auth;
 using LitigApp.Api.Features.Catalog;
 using LitigApp.Api.OpenApi;
 using LitigApp.Application;
 using LitigApp.Infrastructure;
+using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -14,24 +16,30 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
 
 // ── JWT Bearer auth ───────────────────────────────────────────────────────────
-var jwtSection = builder.Configuration.GetSection("Jwt");
+// JwtOptions is validated at startup by AddInfrastructure via ValidateOnStart.
+// We bind again here to build TokenValidationParameters before the host starts.
+var jwtOpts = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+    ?? throw new InvalidOperationException("Jwt configuration section is missing.");
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false; // keep "sub" as-is, don't map to ClaimTypes.NameIdentifier
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSection["Issuer"],
-            ValidAudience = jwtSection["Audience"],
+            ClockSkew = TimeSpan.Zero,
+            ValidIssuer = jwtOpts.Issuer,
+            ValidAudience = jwtOpts.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtSection["Secret"]!))
+                Encoding.UTF8.GetBytes(jwtOpts.Secret))
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationPolicies();
 
 // ── OpenAPI (native .NET 10 — NO Swashbuckle) ─────────────────────────────────
 builder.Services.AddOpenApi(options =>
