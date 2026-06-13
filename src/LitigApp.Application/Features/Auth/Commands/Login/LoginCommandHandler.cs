@@ -1,6 +1,6 @@
 using LitigApp.Application.Common.Abstractions;
-using LitigApp.Domain.Auth;
 using LitigApp.Domain.Common;
+using RefreshTokenEntity = LitigApp.Domain.Auth.RefreshToken;
 
 namespace LitigApp.Application.Features.Auth.Commands.Login;
 
@@ -37,7 +37,7 @@ public sealed class LoginCommandHandler : ICommandHandler<LoginCommand, AuthToke
         var tokenHash = _jwtTokenService.HashRefreshToken(rawRefresh);
         var now = _dateTimeProvider.UtcNow;
 
-        var refreshToken = new RefreshToken
+        var refreshToken = new RefreshTokenEntity
         {
             Id = Guid.NewGuid(),
             UserId = userId,

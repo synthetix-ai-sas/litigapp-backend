@@ -57,4 +57,36 @@ public sealed class IdentityService : IIdentityService
         var roles = await _userManager.GetRolesAsync(user);
         return [.. roles];
     }
+
+    public async Task<string?> GetUserEmailAsync(string userId, CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        return user?.Email;
+    }
+
+    public async Task<string?> GetPasswordResetTokenAsync(string email, CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user is null)
+            return null;
+
+        return await _userManager.GeneratePasswordResetTokenAsync(user);
+    }
+
+    public async Task<IdentityOperationResult> ResetPasswordAsync(
+        string email, string resetToken, string newPassword, CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user is null)
+            return new IdentityOperationResult(false, null, "User not found.");
+
+        var result = await _userManager.ResetPasswordAsync(user, resetToken, newPassword);
+        if (!result.Succeeded)
+        {
+            var error = string.Join("; ", result.Errors.Select(e => e.Description));
+            return new IdentityOperationResult(false, null, error);
+        }
+
+        return new IdentityOperationResult(true, user.Id, null);
+    }
 }
