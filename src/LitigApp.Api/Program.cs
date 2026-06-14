@@ -1,12 +1,15 @@
 using System.Text;
+using Hangfire;
 using LitigApp.Api.Auth;
 using LitigApp.Api.Features.Auth;
 using LitigApp.Api.Features.Catalog;
+using LitigApp.Api.Hangfire;
 using LitigApp.Api.OpenApi;
 using LitigApp.Application;
 using LitigApp.Infrastructure;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Persistence;
+using LitigApp.Jobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -32,6 +35,7 @@ try
 
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddApplication();
+    builder.Services.AddJobs(builder.Configuration);
 
     // AddIdentity() overrides DefaultChallengeScheme to cookies (302 redirect).
     // Explicitly set all three so unauthenticated JWT requests get 401, not a redirect.
@@ -92,6 +96,14 @@ try
 
     app.UseAuthentication();
     app.UseAuthorization();
+
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = [new HangfireDashboardAuthFilter()],
+        DarkModeEnabled = false,
+    });
+
+    HangfireConfiguration.RegisterRecurringJobs(app.Services);
 
     app.UseSerilogRequestLogging(opts =>
     {

@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Hangfire.Core" Version="1.8.20" />
+    <!-- Override Hangfire's transitive Newtonsoft.Json 11.x (high CVE) with a safe version -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\LitigApp.Application\LitigApp.Application.csproj" />
     <ProjectReference Include="..\LitigApp.Infrastructure\LitigApp.Infrastructure.csproj" />
     <ProjectReference Include="..\LitigApp.Domain\LitigApp.Domain.csproj" />
