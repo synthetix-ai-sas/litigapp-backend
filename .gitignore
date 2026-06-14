@@ -68,3 +68,6 @@ desktop.ini
 ## Docker local volumes
 postgres_data/
 .worktrees/
+
+# Serilog file sink
+logs/
