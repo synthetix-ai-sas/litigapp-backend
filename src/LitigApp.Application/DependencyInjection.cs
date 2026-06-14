@@ -1,4 +1,5 @@
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Common.Behaviors;
 using LitigApp.Application.Features.Auth;
 using LitigApp.Application.Features.Auth.Commands.Login;
 using LitigApp.Application.Features.Auth.Commands.RefreshToken;
@@ -35,6 +36,9 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListEntitiesQuery, List<EntityDto>>, ListEntitiesHandler>();
         services.AddScoped<IQueryHandler<ListCourtsByCityQuery, List<CourtDto>>, ListCourtsByCityHandler>();
         services.AddScoped<IQueryHandler<SearchCourtsQuery, List<CourtDto>>, SearchCourtsHandler>();
+
+        // Decorate all ICommandHandler<,> registrations with LoggingBehavior (Commands only — not Queries)
+        services.Decorate(typeof(ICommandHandler<,>), typeof(LoggingBehavior<,>));
 
         return services;
     }
