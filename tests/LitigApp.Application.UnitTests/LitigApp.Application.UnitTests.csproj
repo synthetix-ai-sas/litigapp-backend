@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\LitigApp.Application\LitigApp.Application.csproj" />
     <ProjectReference Include="..\..\src\LitigApp.Domain\LitigApp.Domain.csproj" />
+    <ProjectReference Include="..\..\src\LitigApp.Infrastructure\LitigApp.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,145 @@
+using System.Security.Claims;
+using LitigApp.Api.Auth;
+using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Features.Auth;
+using LitigApp.Application.Features.Auth.Commands.Login;
+using LitigApp.Application.Features.Auth.Commands.Register;
+using LitigApp.Application.Features.Auth.Commands.RefreshToken;
+using LitigApp.Application.Features.Auth.Commands.RequestPasswordReset;
+using LitigApp.Application.Features.Auth.Commands.ResetPassword;
+using LitigApp.Domain.Common;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.JsonWebTokens;
+
+namespace LitigApp.Api.Features.Auth;
+
+public static class AuthEndpoints
+{
+    public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/v1/auth")
+            .WithTags("Auth");
+
+        group.MapPost("/register", RegisterAsync)
+            .WithName("Register")
+            .WithSummary("Register a new user account")
+            .Produces<AuthTokensResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .AllowAnonymous();
+
+        group.MapPost("/login", LoginAsync)
+            .WithName("Login")
+            .WithSummary("Authenticate with email and password")
+            .Produces<AuthTokensResponse>(StatusCodes.Status200OK)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .AllowAnonymous();
+
+        group.MapGet("/me", GetMeAsync)
+            .WithName("GetCurrentUser")
+            .WithSummary("Get current authenticated user info")
+            .Produces<MeResponse>(StatusCodes.Status200OK)
+            .RequireAuthorization(AuthorizationPolicies.User);
+
+        group.MapPost("/refresh", RefreshAsync)
+            .WithName("RefreshToken")
+            .WithSummary("Rotate a refresh token and issue new token pair")
+            .Produces<AuthTokensResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .AllowAnonymous();
+
+        group.MapPost("/password-reset/request", RequestPasswordResetAsync)
+            .WithName("RequestPasswordReset")
+            .WithSummary("Request a password reset email")
+            .Produces(StatusCodes.Status204NoContent)
+            .AllowAnonymous();
+
+        group.MapPost("/password-reset/confirm", ConfirmPasswordResetAsync)
+            .WithName("ConfirmPasswordReset")
+            .WithSummary("Reset password using the token received by email")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .AllowAnonymous();
+
+        return app;
+    }
+
+    private static async Task<IResult> RegisterAsync(
+        [FromBody] RegisterCommand command,
+        ICommandHandler<RegisterCommand, AuthTokensResponse> handler,
+        CancellationToken ct)
+    {
+        var result = await handler.HandleAsync(command, ct);
+
+        return result.IsSuccess
+            ? TypedResults.Created((string?)null, result.Value)
+            : TypedResults.Problem(
+                detail: result.Error,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Registration failed.");
+    }
+
+    private static async Task<IResult> LoginAsync(
+        [FromBody] LoginCommand command,
+        ICommandHandler<LoginCommand, AuthTokensResponse> handler,
+        CancellationToken ct)
+    {
+        var result = await handler.HandleAsync(command, ct);
+
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : TypedResults.Problem(
+                detail: result.Error,
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Authentication failed.");
+    }
+
+    private static IResult GetMeAsync(ClaimsPrincipal user)
+    {
+        var userId = user.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        var email = user.FindFirstValue(JwtRegisteredClaimNames.Email);
+        return TypedResults.Ok(new MeResponse(userId!, email!));
+    }
+
+    private static async Task<IResult> RefreshAsync(
+        [FromBody] RefreshTokenCommand command,
+        ICommandHandler<RefreshTokenCommand, AuthTokensResponse> handler,
+        CancellationToken ct)
+    {
+        var result = await handler.HandleAsync(command, ct);
+
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : TypedResults.Problem(
+                detail: result.Error,
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Token refresh failed.");
+    }
+
+    private static async Task<IResult> RequestPasswordResetAsync(
+        [FromBody] RequestPasswordResetCommand command,
+        ICommandHandler<RequestPasswordResetCommand, Unit> handler,
+        CancellationToken ct)
+    {
+        await handler.HandleAsync(command, ct);
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<IResult> ConfirmPasswordResetAsync(
+        [FromBody] ResetPasswordCommand command,
+        ICommandHandler<ResetPasswordCommand, Unit> handler,
+        CancellationToken ct)
+    {
+        var result = await handler.HandleAsync(command, ct);
+
+        return result.IsSuccess
+            ? TypedResults.NoContent()
+            : TypedResults.Problem(
+                detail: result.Error,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Password reset failed.");
+    }
+}
+
+public record MeResponse(string UserId, string Email);
