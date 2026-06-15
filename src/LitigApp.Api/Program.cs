@@ -103,8 +103,6 @@ try
         DarkModeEnabled = false,
     });
 
-    HangfireConfiguration.RegisterRecurringJobs(app.Services);
-
     app.UseSerilogRequestLogging(opts =>
     {
         opts.MessageTemplate = "HTTP {RequestMethod} {RequestPath} → {StatusCode} in {Elapsed:0.0000} ms";

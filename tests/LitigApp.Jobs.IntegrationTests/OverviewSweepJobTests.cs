@@ -54,26 +54,17 @@ public sealed class OverviewSweepJobTests : IAsyncLifetime
     [Fact]
     public void RegisterRecurringJobs_Registers_OverviewSweep()
     {
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(
-            new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["RamaJudicial:Sweep:OverviewIntervalMinutes"] = "15",
-                    ["RamaJudicial:Sweep:BatchSize"] = "50",
-                    ["RamaJudicial:Sweep:MinimumHoursBetweenSyncsPerProcess"] = "22",
-                })
-                .Build());
-        services.AddOptions<SweepOptions>()
-            .BindConfiguration(SweepOptions.SectionName)
-            .ValidateDataAnnotations();
+        // InitializeAsync configured GlobalConfiguration with the Testcontainers Postgres,
+        // so new RecurringJobManager() picks up the correct storage.
+        var manager = new RecurringJobManager();
+        var sweepOpts = new SweepOptions
+        {
+            OverviewIntervalMinutes = 15,
+            BatchSize = 50,
+            MinimumHoursBetweenSyncsPerProcess = 22,
+        };
 
-        // Fake job registration (we just verify no exception is thrown and the method runs)
-        var provider = services.BuildServiceProvider();
-
-        // HangfireConfiguration.RegisterRecurringJobs requires Hangfire storage to be configured
-        // (done in InitializeAsync). Calling it should not throw.
-        var act = () => HangfireConfiguration.RegisterRecurringJobs(provider);
+        var act = () => HangfireConfiguration.RegisterRecurringJobs(manager, sweepOpts);
         act.Should().NotThrow();
     }
 

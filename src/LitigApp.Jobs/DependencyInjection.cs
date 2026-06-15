@@ -32,6 +32,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<OverviewSweepJob>();
+        services.AddHostedService<HangfireRecurringJobsHostedService>();
 
         return services;
     }
