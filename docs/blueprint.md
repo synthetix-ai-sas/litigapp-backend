@@ -274,11 +274,14 @@ litigapp-backend/
 │   │
 │   ├── LitigApp.Jobs/                          # csproj — referencia: Application, Infrastructure
 │   │   ├── ProcessSyncJobs/
-│   │   │   ├── HotSyncJob.cs                   # diario 06:00 COT — solo overview
-│   │   │   ├── DeepSyncJob.cs                  # encolado por HotSync — detalle + sujetos + actuaciones (página 1)
-│   │   │   └── InitialFetchJob.cs              # encolado por import o creación — fetch completo (página 1)
+│   │   │   ├── OverviewSweepJob.cs             # recurrente cada 15min — overview de todos los procesos activos
+│   │   │   ├── ActionsSweepJob.cs              # encolado por OverviewSweep si hay pending_actions
+│   │   │   ├── CompletePartialFetchJob.cs      # encolado si creación individual quedó parcial por WAF
+│   │   │   └── BulkImportJob.cs                # encolado por POST /imports — hasta 5000 filas
 │   │   ├── NotificationJobs/
-│   │   │   └── NotificationDispatcherJob.cs    # cada 5 min — procesa outbox
+│   │   │   ├── DispatchUserNotificationsJob.cs # triggered al final de ActionsSweep por cada usuario con cambios
+│   │   │   ├── DispatchImportCompleteJob.cs    # triggered al final de BulkImport — email de resumen
+│   │   │   └── NotificationFallbackSweepJob.cs # recurrente cada hora — reintenta outbox huérfanos
 │   │   ├── MaintenanceJobs/
 │   │   │   ├── OutboxCleanupJob.cs             # semanal — borra outbox 'sent' > 30 días
 │   │   │   └── ImportJobsCleanupJob.cs         # semanal — borra import_jobs > 90 días

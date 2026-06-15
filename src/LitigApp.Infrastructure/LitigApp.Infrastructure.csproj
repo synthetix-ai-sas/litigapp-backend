@@ -19,6 +19,10 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.9.0" />
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.20" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.20.9" />
+    <!-- Override Hangfire's transitive Newtonsoft.Json 11.x (high CVE) with a safe version -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.9.0" />
   </ItemGroup>
