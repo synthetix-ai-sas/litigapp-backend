@@ -66,7 +66,11 @@ Job (Hangfire) → Service (Application/Infrastructure) → `IRamaJudicialClient
 5. **async + CancellationToken** en todo I/O.
 6. **Records para DTOs** y value objects inmutables.
 7. **Migraciones EF versionadas en git**: nunca borres una aplicada.
-8. **Siempre crea ramas feature/{feature} para trabajar en el repo - NUNCA HAGAS COMMIT DIRECTO EN MAIN** 
+8. **⚠️ REGLA CRÍTICA — NUNCA HAGAS COMMIT DIRECTO EN MAIN ⚠️**
+   - SIEMPRE crea una rama `feature/{descripcion}` antes de codear cualquier cosa.
+   - Antes de cualquier `git commit`, verifica con `git branch` que NO estás en `main`.
+   - El único camino de código a `main` es vía PR con squash merge.
+   - Si te das cuenta de que estás en `main` con cambios, haz `git checkout -b feature/xxx` ANTES de commitear.
 
 ## Herramientas disponibles en este repo
 

@@ -1,4 +1,6 @@
 using System.Net;
+using Hangfire;
+using Hangfire.PostgreSql;
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Infrastructure.Catalog;
 using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
@@ -30,6 +32,7 @@ public static class DependencyInjection
             options
                 .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention());
+
 
         // ── JWT Options ───────────────────────────────────────────────────────
         services.AddOptions<JwtOptions>()
@@ -114,6 +117,24 @@ public static class DependencyInjection
         // Catalog
         services.AddMemoryCache();
         services.AddScoped<ICatalogReader, CachedCatalogReader>();
+
+        // ── Hangfire storage (separate 'hangfire' schema) ─────────────────────
+        services.AddHangfire(cfg => cfg
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(
+                opts => opts.UseNpgsqlConnection(connectionString),
+                new PostgreSqlStorageOptions
+                {
+                    SchemaName = "hangfire",
+                    PrepareSchemaIfNecessary = true,
+                    JobExpirationCheckInterval = TimeSpan.FromHours(1),
+                    InvisibilityTimeout = TimeSpan.FromMinutes(30),
+                }));
+
+        // ── Process repository ────────────────────────────────────────────────
+        services.AddScoped<IProcessRepository, ProcessRepository>();
 
         return services;
     }

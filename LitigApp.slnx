@@ -10,5 +10,6 @@
     <Project Path="tests/LitigApp.Api.IntegrationTests/LitigApp.Api.IntegrationTests.csproj" />
     <Project Path="tests/LitigApp.Application.UnitTests/LitigApp.Application.UnitTests.csproj" />
     <Project Path="tests/LitigApp.Domain.UnitTests/LitigApp.Domain.UnitTests.csproj" />
+    <Project Path="tests/LitigApp.Jobs.IntegrationTests/LitigApp.Jobs.IntegrationTests.csproj" />
   </Folder>
 </Solution>
