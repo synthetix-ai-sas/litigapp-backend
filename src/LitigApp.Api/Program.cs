@@ -37,6 +37,12 @@ try
     builder.Services.AddApplication();
     builder.Services.AddJobs(builder.Configuration);
 
+    builder.Services.AddCors(options =>
+        options.AddDefaultPolicy(policy =>
+            policy.WithOrigins("http://localhost:4200")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()));
+
     // AddIdentity() overrides DefaultChallengeScheme to cookies (302 redirect).
     // Explicitly set all three so unauthenticated JWT requests get 401, not a redirect.
     builder.Services.AddAuthentication(options =>
@@ -94,6 +100,7 @@ try
         return 0;
     }
 
+    app.UseCors();
     app.UseAuthentication();
     app.UseAuthorization();
 
