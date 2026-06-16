@@ -14,6 +14,11 @@ using LitigApp.Application.Features.Catalog.Queries.ListDepartments;
 using LitigApp.Application.Features.Catalog.Queries.ListEntities;
 using LitigApp.Application.Features.Catalog.Queries.ListSpecialties;
 using LitigApp.Application.Features.Catalog.Queries.SearchCourts;
+using LitigApp.Application.Common.Models;
+using LitigApp.Application.Features.Processes.Dtos;
+using LitigApp.Application.Features.Processes.Queries.GetProcessById;
+using LitigApp.Application.Features.Processes.Queries.ListNovelties;
+using LitigApp.Application.Features.Processes.Queries.ListProcesses;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LitigApp.Application;
@@ -36,6 +41,11 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListEntitiesQuery, List<EntityDto>>, ListEntitiesHandler>();
         services.AddScoped<IQueryHandler<ListCourtsByCityQuery, List<CourtDto>>, ListCourtsByCityHandler>();
         services.AddScoped<IQueryHandler<SearchCourtsQuery, List<CourtDto>>, SearchCourtsHandler>();
+
+        // Process query handlers
+        services.AddScoped<IQueryHandler<ListNoveltiesQuery, PagedResult<ProcessListItemDto>>, ListNoveltiesHandler>();
+        services.AddScoped<IQueryHandler<ListProcessesQuery, PagedResult<ProcessListItemDto>>, ListProcessesHandler>();
+        services.AddScoped<IQueryHandler<GetProcessByIdQuery, ProcessDetailDto?>, GetProcessByIdHandler>();
 
         // Decorate all ICommandHandler<,> registrations with LoggingBehavior (Commands only — not Queries)
         services.Decorate(typeof(ICommandHandler<,>), typeof(LoggingBehavior<,>));

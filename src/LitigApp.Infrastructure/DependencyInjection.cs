@@ -133,8 +133,9 @@ public static class DependencyInjection
                     InvisibilityTimeout = TimeSpan.FromMinutes(30),
                 }));
 
-        // ── Process repository ────────────────────────────────────────────────
+        // ── Process repository / reader ───────────────────────────────────────
         services.AddScoped<IProcessRepository, ProcessRepository>();
+        services.AddScoped<IProcessReader, ProcessReader>();
 
         return services;
     }

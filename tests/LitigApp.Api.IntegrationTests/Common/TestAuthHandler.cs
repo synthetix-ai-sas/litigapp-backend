@@ -19,6 +19,7 @@ public sealed class TestAuthHandler(
 {
     public const string SchemeName = "Test";
     public const string TestBearerToken = "test-token";
+    public const string TestUserId = "test-user-id";
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -31,7 +32,9 @@ public sealed class TestAuthHandler(
 
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, "test-user-id"),
+            new Claim(ClaimTypes.NameIdentifier, TestUserId),
+            // CurrentUserService resolves the user id from the "sub" claim (MapInboundClaims=false).
+            new Claim("sub", TestUserId),
             new Claim(ClaimTypes.Email, "test@litigapp.co"),
         };
         var identity = new ClaimsIdentity(claims, SchemeName);
