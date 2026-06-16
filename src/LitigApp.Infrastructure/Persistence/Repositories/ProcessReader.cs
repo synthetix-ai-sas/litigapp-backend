@@ -72,7 +72,7 @@ internal sealed class ProcessReader(AppDbContext db) : IProcessReader
     {
         return await db.Processes
             .AsNoTracking()
-            .Where(p => p.Id == id && p.UserId == userId)
+            .Where(p => p.Id == id && p.UserId == userId && p.IsActive)
             .Select(p => new ProcessDetailDto(
                 p.Id,
                 p.FileNumber,
