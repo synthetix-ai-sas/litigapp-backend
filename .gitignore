@@ -71,3 +71,6 @@ postgres_data/
 
 # Serilog file sink
 logs/
+
+## Local design/process docs (kept out of the repo)
+docs/superpowers/
