@@ -3,6 +3,7 @@ using Hangfire;
 using LitigApp.Api.Auth;
 using LitigApp.Api.Features.Auth;
 using LitigApp.Api.Features.Catalog;
+using LitigApp.Api.Features.Processes;
 using LitigApp.Api.Hangfire;
 using LitigApp.Api.OpenApi;
 using LitigApp.Application;
@@ -128,6 +129,7 @@ try
 
     app.MapAuthEndpoints();
     app.MapCatalogEndpoints();
+    app.MapProcessesEndpoints();
 
     app.Run();
     return 0;

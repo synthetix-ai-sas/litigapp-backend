@@ -101,6 +101,81 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             new Domain.Catalog.Court { Id = Guid.NewGuid(), OfficialCode = "630014005010", CityId = "63001", EntityCode = "01", SpecialtyCode = "05", CourtNumber = 1, Name = "JUZGADO 001 LABORAL DEL CIRCUITO DE ARMENIA", IsActive = true, CreatedAt = DateTimeOffset.UtcNow }
         );
 
+        SeedProcesses(db, courtId1);
+
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Seeds processes for the integration-test user (<see cref="TestAuthHandler.TestUserId"/>)
+    /// plus an "other user" process to verify ownership isolation, and a soft-deleted one.
+    /// </summary>
+    private static void SeedProcesses(AppDbContext db, Guid courtId)
+    {
+        var me = TestAuthHandler.TestUserId;
+        var p1 = Guid.NewGuid();
+
+        db.Processes.AddRange(
+            // owned, active, unattended → novelty + list
+            new Domain.Processes.Process
+            {
+                Id = p1, UserId = me, FileNumber = "17001400301020240000001", CourtId = courtId,
+                CustomAlias = "Cliente Uno", CurrentStatus = "Fijacion estado",
+                LastCourtActionAt = new DateTimeOffset(2026, 3, 20, 0, 0, 0, TimeSpan.Zero),
+                Attended = false, IsActive = true, SyncStatus = "ok", SyncPhase = "idle",
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+            },
+            // owned, active, unattended → novelty + list
+            new Domain.Processes.Process
+            {
+                Id = Guid.NewGuid(), UserId = me, FileNumber = "17001400301020240000002", CourtId = courtId,
+                CurrentStatus = "Auto", LastCourtActionAt = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero),
+                Attended = false, IsActive = true, SyncStatus = "ok", SyncPhase = "idle",
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+            },
+            // owned, active, attended → list only (not a novelty)
+            new Domain.Processes.Process
+            {
+                Id = Guid.NewGuid(), UserId = me, FileNumber = "17001400301020240000003", CourtId = courtId,
+                CurrentStatus = "Sentencia", LastCourtActionAt = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero),
+                Attended = true, IsActive = true, SyncStatus = "partial", SyncPhase = "pending_partial_completion",
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+            },
+            // owned but soft-deleted → must be excluded everywhere
+            new Domain.Processes.Process
+            {
+                Id = Guid.NewGuid(), UserId = me, FileNumber = "17001400301020240000004", CourtId = courtId,
+                Attended = false, IsActive = false, SyncStatus = "ok", SyncPhase = "idle",
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+            },
+            // different user → must never appear for the test user
+            new Domain.Processes.Process
+            {
+                Id = Guid.NewGuid(), UserId = "other-user", FileNumber = "17001400301020240000005", CourtId = courtId,
+                Attended = false, IsActive = true, SyncStatus = "ok", SyncPhase = "idle",
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+            }
+        );
+
+        db.ProcessSubjects.AddRange(
+            new Domain.Processes.ProcessSubject
+            {
+                Id = Guid.NewGuid(), ProcessId = p1, SubjectType = "Demandante",
+                Name = "OSCAR ARTURO ORTIZ HENAO", Source = "api", CreatedAt = DateTimeOffset.UtcNow
+            },
+            new Domain.Processes.ProcessSubject
+            {
+                Id = Guid.NewGuid(), ProcessId = p1, SubjectType = "Demandado",
+                Name = "FRANCISCA HELENA GONZALEZ ARIAS", Source = "api", CreatedAt = DateTimeOffset.UtcNow
+            }
+        );
+
+        db.ProcessActions.Add(new Domain.Processes.ProcessAction
+        {
+            Id = Guid.NewGuid(), ProcessId = p1, ExternalActionId = 1001, ConsecutiveNumber = 82,
+            ActionDate = new DateOnly(2026, 3, 20), Action = "Fijacion estado",
+            Annotation = "Actuación registrada", RecordedAt = new DateOnly(2026, 3, 20),
+            CreatedAt = DateTimeOffset.UtcNow
+        });
     }
 }
