@@ -8,6 +8,7 @@ using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Notifications.Email;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Infrastructure.Persistence.Repositories;
+using LitigApp.Infrastructure.Processes;
 using LitigApp.Infrastructure.Time;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -136,6 +137,7 @@ public static class DependencyInjection
         // ── Process repository / reader ───────────────────────────────────────
         services.AddScoped<IProcessRepository, ProcessRepository>();
         services.AddScoped<IProcessReader, ProcessReader>();
+        services.AddScoped<IPartialFetchScheduler, NoOpPartialFetchScheduler>();
 
         return services;
     }
