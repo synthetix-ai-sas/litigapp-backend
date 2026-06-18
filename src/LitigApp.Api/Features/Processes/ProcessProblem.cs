@@ -20,6 +20,7 @@ internal static class ProcessProblem
             ProcessErrorCodes.ProcessNotFoundInRama => (StatusCodes.Status422UnprocessableEntity, "Proceso no encontrado en Rama Judicial."),
             ProcessErrorCodes.RamaOverviewFailed => (StatusCodes.Status503ServiceUnavailable, "No se pudo consultar la Rama Judicial. Intenta de nuevo."),
             ProcessErrorCodes.ProcessNotFound => (StatusCodes.Status404NotFound, "Proceso no encontrado."),
+            ProcessErrorCodes.ProcessDataIncomplete => (StatusCodes.Status409Conflict, "Los datos del proceso aún están incompletos."),
             _ => (StatusCodes.Status500InternalServerError, "Error inesperado."),
         };
 

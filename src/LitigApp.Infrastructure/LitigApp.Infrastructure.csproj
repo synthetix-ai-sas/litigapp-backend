@@ -24,6 +24,7 @@
     <!-- Override Hangfire's transitive Newtonsoft.Json 11.x (high CVE) with a safe version -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+    <PackageReference Include="QuestPDF" Version="2026.6.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.9.0" />
   </ItemGroup>
 

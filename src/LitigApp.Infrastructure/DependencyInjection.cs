@@ -7,6 +7,7 @@ using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Notifications.Email;
 using LitigApp.Infrastructure.Persistence;
+using LitigApp.Infrastructure.Pdf;
 using LitigApp.Infrastructure.Persistence.Repositories;
 using LitigApp.Infrastructure.Processes;
 using LitigApp.Infrastructure.Time;
@@ -138,6 +139,7 @@ public static class DependencyInjection
         services.AddScoped<IProcessRepository, ProcessRepository>();
         services.AddScoped<IProcessReader, ProcessReader>();
         services.AddScoped<IPartialFetchScheduler, NoOpPartialFetchScheduler>();
+        services.AddScoped<IProcessPdfGenerator, ProcessPdfGenerator>();
 
         return services;
     }
