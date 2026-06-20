@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using LitigApp.Application.Common.Abstractions;
 using LitigApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 
 namespace LitigApp.Api.IntegrationTests.Common;
@@ -38,6 +40,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
                 options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
             });
+
+            // Never hit the real WAF-protected Rama Judicial API from tests.
+            services.RemoveAll<IRamaJudicialClient>();
+            services.AddScoped<IRamaJudicialClient, FakeRamaJudicialClient>();
         });
     }
 

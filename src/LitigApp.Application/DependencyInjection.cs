@@ -19,6 +19,11 @@ using LitigApp.Application.Features.Processes.Dtos;
 using LitigApp.Application.Features.Processes.Queries.GetProcessById;
 using LitigApp.Application.Features.Processes.Queries.ListNovelties;
 using LitigApp.Application.Features.Processes.Queries.ListProcesses;
+using LitigApp.Application.Features.Processes.Commands.CreateFromFileNumber;
+using LitigApp.Application.Features.Processes.Commands.CreateFromWizard;
+using LitigApp.Application.Features.Processes.Commands.MarkAttended;
+using LitigApp.Application.Features.Processes.Commands.SoftDelete;
+using LitigApp.Application.Features.Processes.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LitigApp.Application;
@@ -46,6 +51,13 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListNoveltiesQuery, PagedResult<ProcessListItemDto>>, ListNoveltiesHandler>();
         services.AddScoped<IQueryHandler<ListProcessesQuery, PagedResult<ProcessListItemDto>>, ListProcessesHandler>();
         services.AddScoped<IQueryHandler<GetProcessByIdQuery, ProcessDetailDto?>, GetProcessByIdHandler>();
+
+        // Process command handlers (+ shared creation service)
+        services.AddScoped<ProcessCreationService>();
+        services.AddScoped<ICommandHandler<CreateProcessFromFileNumberCommand, ProcessDetailDto>, CreateProcessFromFileNumberHandler>();
+        services.AddScoped<ICommandHandler<CreateProcessFromWizardCommand, ProcessDetailDto>, CreateProcessFromWizardHandler>();
+        services.AddScoped<ICommandHandler<MarkAttendedCommand, Unit>, MarkAttendedHandler>();
+        services.AddScoped<ICommandHandler<SoftDeleteProcessCommand, Unit>, SoftDeleteProcessHandler>();
 
         // Decorate all ICommandHandler<,> registrations with LoggingBehavior (Commands only — not Queries)
         services.Decorate(typeof(ICommandHandler<,>), typeof(LoggingBehavior<,>));
