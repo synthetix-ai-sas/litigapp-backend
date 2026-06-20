@@ -1,6 +1,7 @@
 using System.Text;
 using Hangfire;
 using LitigApp.Api.Auth;
+using LitigApp.Api.Cors;
 using LitigApp.Api.Features.Auth;
 using LitigApp.Api.Features.Catalog;
 using LitigApp.Api.Features.Processes;
@@ -38,11 +39,22 @@ try
     builder.Services.AddApplication();
     builder.Services.AddJobs(builder.Configuration);
 
+    builder.Services.AddOptions<CorsOptions>()
+        .BindConfiguration(CorsOptions.SectionName)
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+
     builder.Services.AddCors(options =>
         options.AddDefaultPolicy(policy =>
-            policy.WithOrigins("http://localhost:4200")
+        {
+            var allowedOrigins = builder.Configuration
+                .GetSection(CorsOptions.SectionName)
+                .Get<CorsOptions>()?.AllowedOrigins ?? [];
+
+            policy.WithOrigins(allowedOrigins)
                   .AllowAnyHeader()
-                  .AllowAnyMethod()));
+                  .AllowAnyMethod();
+        }));
 
     // AddIdentity() overrides DefaultChallengeScheme to cookies (302 redirect).
     // Explicitly set all three so unauthenticated JWT requests get 401, not a redirect.
