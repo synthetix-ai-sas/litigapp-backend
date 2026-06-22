@@ -73,6 +73,23 @@ try
 
     builder.Services.AddAuthorizationPolicies();
 
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.WithOrigins(
+                      "http://localhost:4200",
+                      "https://localhost:4200",
+                      "http://192.168.10.134:4200",
+                      "capacitor://localhost",
+                      "ionic://localhost",
+                      "http://localhost")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        });
+    });
+
     builder.Services.AddOpenApi(options =>
     {
         options.AddDocumentTransformer((document, _, _) =>
@@ -98,6 +115,7 @@ try
         return 0;
     }
 
+    app.UseCors();
     app.UseAuthentication();
     app.UseAuthorization();
 
