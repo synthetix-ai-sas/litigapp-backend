@@ -1,0 +1,26 @@
+# litigapp-api — Railway service exposing HTTP (controllers, OpenAPI, Hangfire dashboard).
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet publish src/LitigApp.Api/LitigApp.Api.csproj -c Release -o /app
+
+# Self-contained migrations runner per blueprint section 14: Railway's release command
+# runs ./efbundle before the new deploy takes traffic. The runtime image below has no
+# SDK/dotnet-ef, so this bundle is how migrations get applied without one.
+RUN dotnet tool install --global dotnet-ef --version 10.0.8
+ENV PATH="$PATH:/root/.dotnet/tools"
+RUN dotnet ef migrations bundle \
+    --project src/LitigApp.Infrastructure/LitigApp.Infrastructure.csproj \
+    --startup-project src/LitigApp.Api/LitigApp.Api.csproj \
+    --configuration Release \
+    --self-contained \
+    --target-runtime linux-x64 \
+    --output /app/efbundle
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app .
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8080
+ENV LITIGAPP_ROLE=api
+ENTRYPOINT ["dotnet", "LitigApp.Api.dll"]

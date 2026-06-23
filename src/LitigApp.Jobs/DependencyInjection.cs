@@ -7,9 +7,16 @@ namespace LitigApp.Jobs;
 
 public static class DependencyInjection
 {
+    /// <summary>
+    /// <paramref name="isWorker"/> controls Hangfire server sizing per section 14 of the blueprint:
+    /// the api process only drains light/critical queues (notifications) so digest emails aren't
+    /// delayed by sync load, while the worker process drains the heavy sync/import queues and owns
+    /// recurring-job registration.
+    /// </summary>
     public static IServiceCollection AddJobs(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool isWorker)
     {
         services.AddOptions<SweepOptions>()
             .BindConfiguration(SweepOptions.SectionName)
@@ -19,20 +26,28 @@ public static class DependencyInjection
         // Hangfire server — queues matching section 10 of blueprint
         services.AddHangfireServer(opts =>
         {
-            opts.Queues =
-            [
-                "overview_sweep",
-                "actions_sweep",
-                "partial_fetch",
-                "bulk_import",
-                "notifications",
-                "default"
-            ];
-            opts.WorkerCount = Math.Max(Environment.ProcessorCount * 2, 4);
+            opts.Queues = isWorker
+                ?
+                [
+                    "overview_sweep",
+                    "actions_sweep",
+                    "partial_fetch",
+                    "bulk_import",
+                    "notifications",
+                    "default"
+                ]
+                : ["notifications", "default"];
+            opts.WorkerCount = isWorker
+                ? Math.Max(Environment.ProcessorCount * 2, 4)
+                : 2;
         });
 
         services.AddScoped<OverviewSweepJob>();
-        services.AddHostedService<HangfireRecurringJobsHostedService>();
+
+        if (isWorker)
+        {
+            services.AddHostedService<HangfireRecurringJobsHostedService>();
+        }
 
         return services;
     }
