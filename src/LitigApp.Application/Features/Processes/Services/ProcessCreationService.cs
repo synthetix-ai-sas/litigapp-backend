@@ -138,13 +138,13 @@ public sealed class ProcessCreationService(
 
         if (missing.Count > 0)
         {
-            process.SyncStatus = "partial";
+            process.SyncStatus = ProcessSyncStatus.Partial;
             process.SyncPhase = "pending_partial_completion";
             process.SyncError = $"No se pudo completar: {string.Join(", ", missing)}.";
         }
         else
         {
-            process.SyncStatus = "ok";
+            process.SyncStatus = ProcessSyncStatus.Ok;
             process.SyncPhase = "idle";
             process.LastSyncedAt = now;
         }
