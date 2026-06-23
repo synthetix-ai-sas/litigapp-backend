@@ -48,7 +48,7 @@ public sealed class OverviewSweepJob(
                 if (overview is null)
                 {
                     process.SyncPhase = "idle";
-                    process.SyncStatus = "not_found";
+                    process.SyncStatus = ProcessSyncStatus.NotFound;
                     notFound++;
                 }
                 else if (overview.LastActionDate.HasValue &&
@@ -63,7 +63,7 @@ public sealed class OverviewSweepJob(
                 else
                 {
                     process.SyncPhase = "idle";
-                    process.SyncStatus = "ok";
+                    process.SyncStatus = ProcessSyncStatus.Ok;
                     process.LastSyncedAt = DateTimeOffset.UtcNow;
                     process.ExternalProcessId ??= overview.ExternalProcessId;
                     process.ExternalConnectionId ??= overview.ExternalConnectionId;
@@ -80,7 +80,7 @@ public sealed class OverviewSweepJob(
                 {
                     case FailureKind.NotFound:
                         process.SyncPhase = "idle";
-                        process.SyncStatus = "not_found";
+                        process.SyncStatus = ProcessSyncStatus.NotFound;
                         notFound++;
                         processed++;
                         break;
@@ -95,7 +95,7 @@ public sealed class OverviewSweepJob(
                         break;
 
                     case FailureKind.Transient:
-                        process.SyncStatus = "error";
+                        process.SyncStatus = ProcessSyncStatus.Error;
                         process.SyncAttempts++;
                         process.SyncError = failure.Message;
                         errors++;
@@ -106,7 +106,7 @@ public sealed class OverviewSweepJob(
                         break;
 
                     default:
-                        process.SyncStatus = "error";
+                        process.SyncStatus = ProcessSyncStatus.Error;
                         process.SyncAttempts++;
                         process.SyncError = failure.Message;
                         errors++;

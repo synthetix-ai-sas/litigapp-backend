@@ -10,6 +10,7 @@ using LitigApp.Application.Features.Processes.Queries.GetProcessById;
 using LitigApp.Application.Features.Processes.Queries.ListNovelties;
 using LitigApp.Application.Features.Processes.Queries.ListProcesses;
 using LitigApp.Domain.Common;
+using LitigApp.Domain.Processes;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
@@ -164,7 +165,7 @@ public static class ProcessesEndpoints
             return TypedResults.NotFound();
 
         // Guard: the PDF must reflect complete, synced data.
-        if (process.SyncStatus != "ok")
+        if (process.SyncStatus != ProcessSyncStatus.Ok)
             return ProcessProblem.From(ProcessErrorCodes.ProcessDataIncomplete);
 
         var bytes = pdfGenerator.Generate(process);

@@ -95,7 +95,7 @@ internal sealed class ProcessReader(AppDbContext db) : IProcessReader
                 p.Attended,
                 p.SyncStatus,
                 p.SyncPhase,
-                p.SyncStatus == "ok",
+                p.SyncStatus == ProcessSyncStatus.Ok,
                 p.Subjects
                     .Select(s => new ProcessSubjectDto(s.SubjectType, s.Name, s.Identification, s.IsSummoned))
                     .ToList(),

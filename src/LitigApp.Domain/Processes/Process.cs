@@ -34,7 +34,7 @@ public class Process
     public DateTimeOffset? LastSyncedAt { get; set; }
     public DateTimeOffset? LastSyncAttemptAt { get; set; }
     public int LastExternalConsecutive { get; set; }
-    public string SyncStatus { get; set; } = "pending";
+    public string SyncStatus { get; set; } = ProcessSyncStatus.Pending;
     public string SyncPhase { get; set; } = "pending_initial_full";
     public string? SyncError { get; set; }
     public int SyncAttempts { get; set; }

@@ -28,39 +28,9 @@ public static class CatalogSeeder
             return;
 
         db.Departments.AddRange(
-            new Department { Id = "05", Name = "ANTIOQUIA" },
-            new Department { Id = "08", Name = "ATLÁNTICO" },
-            new Department { Id = "11", Name = "BOGOTÁ" },
-            new Department { Id = "13", Name = "BOLÍVAR" },
-            new Department { Id = "15", Name = "BOYACÁ" },
             new Department { Id = "17", Name = "CALDAS" },
-            new Department { Id = "18", Name = "CAQUETÁ" },
-            new Department { Id = "19", Name = "CAUCA" },
-            new Department { Id = "20", Name = "CESAR" },
-            new Department { Id = "23", Name = "CÓRDOBA" },
-            new Department { Id = "25", Name = "CUNDINAMARCA" },
-            new Department { Id = "27", Name = "CHOCÓ" },
-            new Department { Id = "41", Name = "HUILA" },
-            new Department { Id = "44", Name = "LA GUAJIRA" },
-            new Department { Id = "47", Name = "MAGDALENA" },
-            new Department { Id = "50", Name = "META" },
-            new Department { Id = "52", Name = "NARIÑO" },
-            new Department { Id = "54", Name = "NORTE DE SANTANDER" },
             new Department { Id = "63", Name = "QUINDÍO" },
-            new Department { Id = "66", Name = "RISARALDA" },
-            new Department { Id = "68", Name = "SANTANDER" },
-            new Department { Id = "70", Name = "SUCRE" },
-            new Department { Id = "73", Name = "TOLIMA" },
-            new Department { Id = "76", Name = "VALLE DEL CAUCA" },
-            new Department { Id = "81", Name = "ARAUCA" },
-            new Department { Id = "85", Name = "CASANARE" },
-            new Department { Id = "86", Name = "PUTUMAYO" },
-            new Department { Id = "88", Name = "SAN ANDRÉS" },
-            new Department { Id = "91", Name = "AMAZONAS" },
-            new Department { Id = "94", Name = "GUAINÍA" },
-            new Department { Id = "95", Name = "GUAVIARE" },
-            new Department { Id = "97", Name = "VAUPÉS" },
-            new Department { Id = "99", Name = "VICHADA" });
+            new Department { Id = "66", Name = "RISARALDA" });
 
         await db.SaveChangesAsync(ct);
     }
@@ -74,21 +44,6 @@ public static class CatalogSeeder
         City C(string id, string name) => new() { Id = id, DepartmentId = id[..2], Name = name };
 
         db.Cities.AddRange(
-            // RISARALDA (66)
-            C("66001", "PEREIRA"),
-            C("66045", "APÍA"),
-            C("66075", "BALBOA"),
-            C("66088", "BELÉN DE UMBRÍA"),
-            C("66170", "DOSQUEBRADAS"),
-            C("66318", "GUÁTICA"),
-            C("66383", "LA CELIA"),
-            C("66400", "LA VIRGINIA"),
-            C("66440", "MARSELLA"),
-            C("66456", "MISTRATÓ"),
-            C("66572", "PUEBLO RICO"),
-            C("66594", "QUINCHIA"),
-            C("66682", "SANTA ROSA DE CABAL"),
-            C("66687", "SANTUARIO"),
             // CALDAS (17)
             C("17001", "MANIZALES"),
             C("17013", "AGUADAS"),
@@ -129,7 +84,22 @@ public static class CatalogSeeder
             C("63470", "MONTENEGRO"),
             C("63548", "PIJAO"),
             C("63594", "QUIMBAYA"),
-            C("63690", "SALENTO"));
+            C("63690", "SALENTO"),
+            // RISARALDA (66)
+            C("66001", "PEREIRA"),
+            C("66045", "APÍA"),
+            C("66075", "BALBOA"),
+            C("66088", "BELÉN DE UMBRÍA"),
+            C("66170", "DOSQUEBRADAS"),
+            C("66318", "GUÁTICA"),
+            C("66383", "LA CELIA"),
+            C("66400", "LA VIRGINIA"),
+            C("66440", "MARSELLA"),
+            C("66456", "MISTRATÓ"),
+            C("66572", "PUEBLO RICO"),
+            C("66594", "QUINCHIA"),
+            C("66682", "SANTA ROSA DE CABAL"),
+            C("66687", "SANTUARIO"));
 
         await db.SaveChangesAsync(ct);
     }
