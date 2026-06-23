@@ -1,0 +1,13 @@
+# litigapp-worker — Railway service running Hangfire jobs only, no HTTP surface.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet publish src/LitigApp.Api/LitigApp.Api.csproj -c Release -o /app
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app .
+ENV ASPNETCORE_URLS=
+ENV ASPNETCORE_HTTP_PORTS=
+ENV LITIGAPP_ROLE=worker
+ENTRYPOINT ["dotnet", "LitigApp.Api.dll"]

@@ -33,6 +33,11 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
+    // Railway runs two services off this same image: "api" (HTTP, default) and "worker"
+    // (Hangfire server only, no HTTP surface). See Dockerfile.api / Dockerfile.worker.
+    var isWorker = string.Equals(
+        builder.Configuration["LITIGAPP_ROLE"], "worker", StringComparison.OrdinalIgnoreCase);
+
     builder.Host.UseSerilog((ctx, services, cfg) => cfg
         .ReadFrom.Configuration(ctx.Configuration)
         .ReadFrom.Services(services)
@@ -40,71 +45,74 @@ try
 
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddApplication();
-    builder.Services.AddJobs(builder.Configuration);
+    builder.Services.AddJobs(builder.Configuration, isWorker);
 
-    builder.Services.AddOptions<CorsOptions>()
-        .BindConfiguration(CorsOptions.SectionName)
-        .ValidateDataAnnotations()
-        .ValidateOnStart();
-
-    builder.Services.AddCors(options =>
-        options.AddDefaultPolicy(policy =>
-        {
-            var allowedOrigins = builder.Configuration
-                .GetSection(CorsOptions.SectionName)
-                .Get<CorsOptions>()?.AllowedOrigins ?? [];
-
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        }));
-
-    // AddIdentity() overrides DefaultChallengeScheme to cookies (302 redirect).
-    // Explicitly set all three so unauthenticated JWT requests get 401, not a redirect.
-    builder.Services.AddAuthentication(options =>
+    if (!isWorker)
     {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
-    })
-    .AddJwtBearer();
+        builder.Services.AddOptions<CorsOptions>()
+            .BindConfiguration(CorsOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
-    // Configure via IOptions<JwtOptions> (post-Build) so WebApplicationFactory test
-    // overrides are picked up. Reading builder.Configuration here would miss them.
-    builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
-        .Configure<Microsoft.Extensions.Options.IOptions<JwtOptions>>((bearerOpts, jwtOpts) =>
-        {
-            bearerOpts.MapInboundClaims = false;
-            bearerOpts.TokenValidationParameters = new TokenValidationParameters
+        builder.Services.AddCors(options =>
+            options.AddDefaultPolicy(policy =>
             {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ClockSkew = TimeSpan.Zero,
-                ValidIssuer = jwtOpts.Value.Issuer,
-                ValidAudience = jwtOpts.Value.Audience,
-                IssuerSigningKey = new SymmetricSecurityKey(
-                    Encoding.UTF8.GetBytes(jwtOpts.Value.Secret))
-            };
-        });
+                var allowedOrigins = builder.Configuration
+                    .GetSection(CorsOptions.SectionName)
+                    .Get<CorsOptions>()?.AllowedOrigins ?? [];
 
-    builder.Services.AddAuthorizationPolicies();
+                policy.WithOrigins(allowedOrigins)
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            }));
 
-    builder.Services.AddOpenApi(options =>
-    {
-        options.AddDocumentTransformer((document, _, _) =>
+        // AddIdentity() overrides DefaultChallengeScheme to cookies (302 redirect).
+        // Explicitly set all three so unauthenticated JWT requests get 401, not a redirect.
+        builder.Services.AddAuthentication(options =>
         {
-            document.Info = new()
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer();
+
+        // Configure via IOptions<JwtOptions> (post-Build) so WebApplicationFactory test
+        // overrides are picked up. Reading builder.Configuration here would miss them.
+        builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<Microsoft.Extensions.Options.IOptions<JwtOptions>>((bearerOpts, jwtOpts) =>
             {
-                Title = "LitigApp API",
-                Version = "v1",
-                Description = "Backend de LitigApp — monitoreo de procesos judiciales en Colombia."
-            };
-            return Task.CompletedTask;
+                bearerOpts.MapInboundClaims = false;
+                bearerOpts.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ClockSkew = TimeSpan.Zero,
+                    ValidIssuer = jwtOpts.Value.Issuer,
+                    ValidAudience = jwtOpts.Value.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(jwtOpts.Value.Secret))
+                };
+            });
+
+        builder.Services.AddAuthorizationPolicies();
+
+        builder.Services.AddOpenApi(options =>
+        {
+            options.AddDocumentTransformer((document, _, _) =>
+            {
+                document.Info = new()
+                {
+                    Title = "LitigApp API",
+                    Version = "v1",
+                    Description = "Backend de LitigApp — monitoreo de procesos judiciales en Colombia."
+                };
+                return Task.CompletedTask;
+            });
+            options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
         });
-        options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
-    });
+    }
 
     var app = builder.Build();
 
@@ -116,42 +124,49 @@ try
         return 0;
     }
 
-    app.UseCors();
-    app.UseAuthentication();
-    app.UseAuthorization();
-
-    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    if (!isWorker)
     {
-        Authorization = [new HangfireDashboardAuthFilter()],
-        DarkModeEnabled = false,
-    });
+        app.UseCors();
+        app.UseAuthentication();
+        app.UseAuthorization();
 
-    app.UseSerilogRequestLogging(opts =>
-    {
-        opts.MessageTemplate = "HTTP {RequestMethod} {RequestPath} → {StatusCode} in {Elapsed:0.0000} ms";
-        opts.GetLevel = (httpCtx, elapsed, ex) => ex != null
-            ? LogEventLevel.Error
-            : httpCtx.Response.StatusCode > 499
+        app.UseHangfireDashboard("/hangfire", new DashboardOptions
+        {
+            Authorization = [new HangfireDashboardAuthFilter()],
+            DarkModeEnabled = false,
+        });
+
+        app.UseSerilogRequestLogging(opts =>
+        {
+            opts.MessageTemplate = "HTTP {RequestMethod} {RequestPath} → {StatusCode} in {Elapsed:0.0000} ms";
+            opts.GetLevel = (httpCtx, elapsed, ex) => ex != null
                 ? LogEventLevel.Error
-                : elapsed > 1000 ? LogEventLevel.Warning : LogEventLevel.Information;
-    });
+                : httpCtx.Response.StatusCode > 499
+                    ? LogEventLevel.Error
+                    : elapsed > 1000 ? LogEventLevel.Warning : LogEventLevel.Information;
+        });
 
-    app.MapOpenApi();
+        app.MapOpenApi();
 
-    app.MapScalarApiReference(options =>
+        app.MapScalarApiReference(options =>
+        {
+            options.Title = "LitigApp API";
+            options.OpenApiRoutePattern = "/openapi/v1.json";
+        });
+
+        app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+            .WithTags("Health")
+            .WithName("HealthCheck")
+            .WithSummary("Health check para Railway");
+
+        app.MapAuthEndpoints();
+        app.MapCatalogEndpoints();
+        app.MapProcessesEndpoints();
+    }
+    else
     {
-        options.Title = "LitigApp API";
-        options.OpenApiRoutePattern = "/openapi/v1.json";
-    });
-
-    app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
-        .WithTags("Health")
-        .WithName("HealthCheck")
-        .WithSummary("Health check para Railway");
-
-    app.MapAuthEndpoints();
-    app.MapCatalogEndpoints();
-    app.MapProcessesEndpoints();
+        Log.Information("Starting in worker role — Hangfire server only, no HTTP endpoints mapped.");
+    }
 
     app.Run();
     return 0;
