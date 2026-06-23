@@ -67,6 +67,13 @@ public static class ProcessesEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/{id:guid}/pdf", DownloadPdf)
+            .WithName("DownloadProcessPdf")
+            .WithSummary("Descarga el PDF del proceso (409 si sync_status != 'ok')")
+            .Produces(StatusCodes.Status200OK, contentType: "application/pdf")
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return app;
     }
 
@@ -144,6 +151,24 @@ public static class ProcessesEndpoints
     {
         var result = await handler.HandleAsync(new SoftDeleteProcessCommand(id), ct);
         return result.IsSuccess ? TypedResults.NoContent() : ProcessProblem.From(result.Error);
+    }
+
+    private static async Task<IResult> DownloadPdf(
+        Guid id,
+        IQueryHandler<GetProcessByIdQuery, ProcessDetailDto?> handler,
+        IProcessPdfGenerator pdfGenerator,
+        CancellationToken ct)
+    {
+        var process = await handler.HandleAsync(new GetProcessByIdQuery(id), ct);
+        if (process is null)
+            return TypedResults.NotFound();
+
+        // Guard: the PDF must reflect complete, synced data.
+        if (process.SyncStatus != "ok")
+            return ProcessProblem.From(ProcessErrorCodes.ProcessDataIncomplete);
+
+        var bytes = pdfGenerator.Generate(process);
+        return TypedResults.File(bytes, "application/pdf", $"proceso-{process.FileNumber}.pdf");
     }
 
     private static IResult CreatedOrProblem(Result<ProcessDetailDto> result) =>

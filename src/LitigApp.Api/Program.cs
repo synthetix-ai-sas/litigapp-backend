@@ -28,6 +28,9 @@ try
 {
     Log.Information("Starting LitigApp API");
 
+    // QuestPDF Community license (free under the revenue threshold).
+    QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
     var builder = WebApplication.CreateBuilder(args);
 
     builder.Host.UseSerilog((ctx, services, cfg) => cfg
