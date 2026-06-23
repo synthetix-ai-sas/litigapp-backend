@@ -10,6 +10,7 @@ using LitigApp.Infrastructure.Persistence;
 using LitigApp.Infrastructure.Pdf;
 using LitigApp.Infrastructure.Persistence.Repositories;
 using LitigApp.Infrastructure.Processes;
+using LitigApp.Infrastructure.Sync;
 using LitigApp.Infrastructure.Time;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -134,6 +135,9 @@ public static class DependencyInjection
                     JobExpirationCheckInterval = TimeSpan.FromHours(1),
                     InvisibilityTimeout = TimeSpan.FromMinutes(30),
                 }));
+
+        // ── Sync engine state (sync_state KV: WAF cooldown + adaptive throttle) ─
+        services.AddScoped<ISyncStateService, SyncStateService>();
 
         // ── Process repository / reader ───────────────────────────────────────
         services.AddScoped<IProcessRepository, ProcessRepository>();

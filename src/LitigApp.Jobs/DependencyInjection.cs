@@ -23,6 +23,16 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<ThrottleOptions>()
+            .BindConfiguration(ThrottleOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<WafOptions>()
+            .BindConfiguration(WafOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         // Hangfire server — queues matching section 10 of blueprint
         services.AddHangfireServer(opts =>
         {
