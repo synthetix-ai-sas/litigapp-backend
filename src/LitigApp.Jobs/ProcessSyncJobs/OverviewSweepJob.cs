@@ -12,6 +12,7 @@ public sealed class OverviewSweepJob(
     IProcessRepository processRepository,
     IRamaJudicialClient ramaClient,
     ISyncStateService syncState,
+    ISyncJobScheduler scheduler,
     IOptions<SweepOptions> sweepOptions,
     IOptions<WafOptions> wafOptions,
     IDateTimeProvider clock,
@@ -142,6 +143,13 @@ public sealed class OverviewSweepJob(
             }
 
             await processRepository.SaveChangesAsync(ct);
+        }
+
+        // Trigger ActionsSweep if this run marked any process pending_actions.
+        if (changed > 0)
+        {
+            logger.LogInformation("OverviewSweepJob enqueuing ActionsSweep ({Changed} changed).", changed);
+            scheduler.EnqueueActionsSweep();
         }
 
         var elapsed = clock.UtcNow - startedAt;

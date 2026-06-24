@@ -10,6 +10,15 @@ public interface IProcessRepository
         TimeSpan minimumTimeBetweenSyncs,
         CancellationToken ct);
 
+    /// <summary>Tracked batch of active processes in sync_phase='pending_actions', oldest attempt first.</summary>
+    Task<List<Process>> GetPendingActionsAsync(int batchSize, CancellationToken ct);
+
+    /// <summary>All persisted actions for a process (read-only) — for diff/dedupe and grouping context.</summary>
+    Task<List<ProcessAction>> GetActionsAsync(Guid processId, CancellationToken ct);
+
+    /// <summary>Stages new action rows to be persisted on the next SaveChanges.</summary>
+    Task AddActionsAsync(IEnumerable<ProcessAction> actions, CancellationToken ct);
+
     /// <summary>True if the user already has a process with this file number (active or not).</summary>
     Task<bool> ExistsAsync(string userId, string fileNumber, CancellationToken ct);
 

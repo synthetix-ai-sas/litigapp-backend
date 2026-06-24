@@ -1,5 +1,6 @@
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Application.Features.Processes.Dtos;
+using LitigApp.Application.Features.Processes.Sync;
 using LitigApp.Domain.Common;
 using LitigApp.Domain.Processes;
 
@@ -106,24 +107,7 @@ public sealed class ProcessCreationService(
         if (actionsResult.IsSuccess && actionsResult.Value is { } actions)
         {
             foreach (var a in actions)
-            {
-                process.Actions.Add(new ProcessAction
-                {
-                    Id = Guid.NewGuid(),
-                    ProcessId = process.Id,
-                    ExternalActionId = a.ExternalActionId,
-                    ConsecutiveNumber = a.ActionNumber,
-                    ActionDate = ToDateOnly(a.ActionDate),
-                    Action = a.ActionType,
-                    Annotation = a.Note,
-                    TermStartDate = ToDateOnly(a.StartDate),
-                    TermEndDate = ToDateOnly(a.EndDate),
-                    RecordedAt = ToDateOnly(a.RegistrationDate),
-                    HasDocuments = a.HasDocuments,
-                    RuleCode = a.RuleCode,
-                    CreatedAt = now,
-                });
-            }
+                process.Actions.Add(ProcessActionFactory.Create(a, process.Id, now));
 
             if (actions.Count > 0)
             {
@@ -161,7 +145,4 @@ public sealed class ProcessCreationService(
 
     private static DateTimeOffset? ToUtc(DateTime? value) =>
         value is null ? null : new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc));
-
-    private static DateOnly? ToDateOnly(DateTime? value) =>
-        value is null ? null : DateOnly.FromDateTime(value.Value);
 }
