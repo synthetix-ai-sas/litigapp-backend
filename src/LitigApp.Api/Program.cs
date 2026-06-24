@@ -55,6 +55,9 @@ try
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        builder.Services.AddOptions<HangfireOptions>()
+            .BindConfiguration(HangfireOptions.SectionName);
+
         builder.Services.AddCors(options =>
             options.AddDefaultPolicy(policy =>
             {
