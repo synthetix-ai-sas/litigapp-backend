@@ -5,9 +5,7 @@ COPY . .
 RUN dotnet publish src/LitigApp.Api/LitigApp.Api.csproj -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
-# Install system dependencies required by the PostgreSQL driver (Npgsql) — same
-# native libs needed in Dockerfile.api, since this image runs the same EF Core /
-# Hangfire.PostgreSql code against the same base runtime.
+# Npgsql native deps — same as Dockerfile.api, same base image and EF Core/Hangfire code.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgssapi-krb5-2 \
     libpq5 \

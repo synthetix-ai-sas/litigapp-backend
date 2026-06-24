@@ -2739,9 +2739,8 @@ volumes: { pg_data: }
 
 **Para producción (obligatorio)** — Railway requiere container. Dos Dockerfiles:
 
-`Dockerfile.api` — API HTTP. Escucha en el puerto que Railway inyecta vía `PORT` en
-runtime (fallback a 8080 para `docker run` local) en lugar de hardcodear un número que
-haya que mantener sincronizado a mano con el "target port" del dashboard de Railway:
+`Dockerfile.api` — API HTTP. Escucha en el `PORT` que inyecta Railway (fallback 8080
+local), para no tener que sincronizar a mano con el "target port" del dashboard:
 ```dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src

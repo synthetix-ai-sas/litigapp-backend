@@ -5,19 +5,12 @@ using Microsoft.Extensions.Configuration;
 namespace LitigApp.Infrastructure.Persistence;
 
 /// <summary>
-/// Used only by `dotnet ef` design-time tooling (migrations add/bundle, and the bundle's
-/// own `database update` when it runs). Without this, EF Core falls back to running the
-/// app's real Program.cs Main to discover the DbContext, which requires the full host
-/// (Jwt options, etc.) to build successfully — unavailable during the Docker build stage,
-/// where Railway hasn't injected any runtime env vars yet.
-///
-/// Resolves the connection string the same places the app would: local
-/// appsettings.Development.json (so `dotnet ef database update` keeps working exactly as
-/// documented, with no extra flags), then ConnectionStrings__Postgres from the environment
-/// (what Railway injects when the Pre-Deploy Command actually runs the bundle in
-/// production). Falls back to a throwaway value only when neither is available, which is
-/// the Docker build stage — `migrations bundle` there only inspects the model and never
-/// opens a connection, so the value doesn't matter.
+/// Used only by `dotnet ef` design-time tooling. Without it, EF Core runs the app's real
+/// Program.cs Main instead, which needs the full host config — unavailable during the
+/// Docker build stage. Resolves the connection string from appsettings.Development.json,
+/// then ConnectionStrings__Postgres from the environment (what Railway's Pre-Deploy
+/// Command sees at runtime), then a throwaway value for the Docker build stage, where
+/// `migrations bundle` only inspects the model and never opens a connection.
 /// </summary>
 public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
@@ -30,8 +23,7 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
             .AddEnvironmentVariables()
             .Build();
 
-        // design-time-only.invalid uses the RFC 2606 reserved .invalid TLD — guaranteed to
-        // never resolve, so it can't be mistaken for a real (if wrong) host.
+        // .invalid is the RFC 2606 reserved TLD — never resolves, can't pass as real.
         var connectionString = configuration.GetConnectionString("Postgres")
             ?? "Host=design-time-only.invalid;Database=unused;Username=unused;Password=unused";
 

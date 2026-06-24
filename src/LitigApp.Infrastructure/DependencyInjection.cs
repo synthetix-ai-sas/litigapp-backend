@@ -39,8 +39,7 @@ public static class DependencyInjection
 
         services.AddScoped<IEmailSender, NoOpEmailSender>();
 
-        // ── JWT / Identity — api role only: the worker never issues or validates
-        // tokens, so it shouldn't need Jwt:Secret configured to boot. ──────────
+        // JWT/Identity — api role only; the worker never issues/validates tokens.
         if (!isWorker)
         {
             services.AddOptions<JwtOptions>()

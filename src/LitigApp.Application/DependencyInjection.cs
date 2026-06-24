@@ -32,9 +32,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services, bool isWorker)
     {
-        // These handlers only back the HTTP endpoints mapped in the api role
-        // (MapAuthEndpoints/MapCatalogEndpoints/MapProcessesEndpoints) — the worker's
-        // sync jobs call Infrastructure services directly, not through these handlers.
+        // Only the api role's HTTP endpoints call these; worker jobs hit Infrastructure directly.
         if (!isWorker)
         {
             // Auth command handlers

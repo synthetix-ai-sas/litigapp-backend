@@ -28,7 +28,6 @@ WORKDIR /app
 COPY --from=build /app .
 EXPOSE 8080
 ENV LITIGAPP_ROLE=api
-# Railway injects PORT at runtime; listen on it instead of hardcoding a value that
-# has to be kept in sync with the dashboard's networking target port. Falls back to
-# 8080 for local `docker run` where PORT isn't set.
+# Listen on Railway's injected PORT, not a hardcoded value (avoids drift vs the
+# dashboard's networking target port). Falls back to 8080 for local `docker run`.
 ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet LitigApp.Api.dll"]

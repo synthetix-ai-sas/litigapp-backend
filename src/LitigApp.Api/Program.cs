@@ -127,12 +127,9 @@ try
 
     if (!isWorker)
     {
-        // Railway terminates TLS at its edge proxy and forwards plain HTTP to the
-        // container, so without this the app thinks every request is http — breaking
-        // the OpenAPI server URL (Scalar's "Try it" then hits http:// from an https://
-        // page and the browser blocks it as mixed content). KnownNetworks/KnownProxies
-        // are cleared because the only inbound traffic is Railway's own proxy — there's
-        // no untrusted network path to the container to spoof X-Forwarded-* from.
+        // Railway terminates TLS and forwards plain HTTP, so without this every URL the
+        // app builds (e.g. the OpenAPI server entry) is http, triggering mixed-content
+        // blocks. Known*.Clear() is safe: the only inbound path is Railway's own proxy.
         var forwardedHeadersOptions = new ForwardedHeadersOptions
         {
             ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
