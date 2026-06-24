@@ -11,14 +11,27 @@ namespace LitigApp.Jobs.ProcessSyncJobs;
 public sealed class OverviewSweepJob(
     IProcessRepository processRepository,
     IRamaJudicialClient ramaClient,
+    ISyncStateService syncState,
     IOptions<SweepOptions> sweepOptions,
+    IOptions<WafOptions> wafOptions,
     IDateTimeProvider clock,
     ILogger<OverviewSweepJob> logger)
 {
     public async Task RunAsync(CancellationToken ct = default)
     {
         var opts = sweepOptions.Value;
+        var waf = wafOptions.Value;
+        var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         var startedAt = clock.UtcNow;
+
+        // WAF cooldown gate — skip the entire run while blocked (blueprint §10.2).
+        var blockedUntil = await syncState.GetWafBlockedUntilAsync(ct);
+        if (blockedUntil is { } until && until > now)
+        {
+            logger.LogInformation(
+                "OverviewSweepJob skipped — WAF cooldown active until {Until:o}.", until);
+            return;
+        }
 
         logger.LogInformation(
             "OverviewSweepJob starting. BatchSize={BatchSize} MinimumHoursBetweenSyncs={Hours}h",
@@ -38,7 +51,7 @@ public sealed class OverviewSweepJob(
         {
             if (ct.IsCancellationRequested || wafTriggered) break;
 
-            process.LastSyncAttemptAt = DateTimeOffset.UtcNow;
+            process.LastSyncAttemptAt = now;
 
             var result = await ramaClient.GetOverviewByFileNumberAsync(process.FileNumber, ct);
 
@@ -64,7 +77,7 @@ public sealed class OverviewSweepJob(
                 {
                     process.SyncPhase = "idle";
                     process.SyncStatus = ProcessSyncStatus.Ok;
-                    process.LastSyncedAt = DateTimeOffset.UtcNow;
+                    process.LastSyncedAt = now;
                     process.ExternalProcessId ??= overview.ExternalProcessId;
                     process.ExternalConnectionId ??= overview.ExternalConnectionId;
                     noChange++;
@@ -86,13 +99,23 @@ public sealed class OverviewSweepJob(
                         break;
 
                     case FailureKind.WafBlocked:
+                    {
+                        // Atomically persist the cooldown (same DbContext also flushes this
+                        // process's LastSyncAttemptAt, which correctly records the attempt).
+                        var cooldownUntil = now.AddMinutes(waf.CooldownMinutesOnBlock);
+                        await syncState.SetWafBlockedUntilAsync(
+                            cooldownUntil,
+                            $"WAF 403 on overview FileNumber={process.FileNumber}",
+                            ct);
                         logger.LogWarning(
-                            "OverviewSweepJob: WAF 403 on FileNumber={FileNumber}. Aborting run — WAF cooldown gate (waf_blocked_until) will be activated in 3.C.",
-                            process.FileNumber);
-                        // Don't mark this process — leave it in its current sync_phase
-                        // so the next run retries it. waf_blocked_until is 3.C scope.
+                            "OverviewSweepJob: WAF 403 on FileNumber={FileNumber}. Cooldown set until {Until:o}. " +
+                            "Aborting run; remaining processes left untouched (re-prioritized next run).",
+                            process.FileNumber, cooldownUntil);
+                        // Leave sync_phase unchanged. Remaining processes keep older
+                        // LastSyncAttemptAt and sort first on the next eligible run.
                         wafTriggered = true;
                         break;
+                    }
 
                     case FailureKind.Transient:
                         process.SyncStatus = ProcessSyncStatus.Error;
