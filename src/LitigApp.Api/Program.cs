@@ -13,6 +13,7 @@ using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Jobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
@@ -126,6 +127,20 @@ try
 
     if (!isWorker)
     {
+        // Railway terminates TLS at its edge proxy and forwards plain HTTP to the
+        // container, so without this the app thinks every request is http — breaking
+        // the OpenAPI server URL (Scalar's "Try it" then hits http:// from an https://
+        // page and the browser blocks it as mixed content). KnownNetworks/KnownProxies
+        // are cleared because the only inbound traffic is Railway's own proxy — there's
+        // no untrusted network path to the container to spoof X-Forwarded-* from.
+        var forwardedHeadersOptions = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+        };
+        forwardedHeadersOptions.KnownIPNetworks.Clear();
+        forwardedHeadersOptions.KnownProxies.Clear();
+        app.UseForwardedHeaders(forwardedHeadersOptions);
+
         app.UseCors();
         app.UseAuthentication();
         app.UseAuthorization();
