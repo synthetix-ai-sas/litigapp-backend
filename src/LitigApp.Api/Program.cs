@@ -43,8 +43,8 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext());
 
-    builder.Services.AddInfrastructure(builder.Configuration);
-    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration, isWorker);
+    builder.Services.AddApplication(isWorker);
     builder.Services.AddJobs(builder.Configuration, isWorker);
 
     if (!isWorker)
