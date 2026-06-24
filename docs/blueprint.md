@@ -2739,7 +2739,9 @@ volumes: { pg_data: }
 
 **Para producción (obligatorio)** — Railway requiere container. Dos Dockerfiles:
 
-`Dockerfile.api` — API HTTP que escucha en :8080:
+`Dockerfile.api` — API HTTP. Escucha en el puerto que Railway inyecta vía `PORT` en
+runtime (fallback a 8080 para `docker run` local) en lugar de hardcodear un número que
+haya que mantener sincronizado a mano con el "target port" del dashboard de Railway:
 ```dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
@@ -2750,8 +2752,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 EXPOSE 8080
-ENV ASPNETCORE_URLS=http://+:8080
-ENTRYPOINT ["dotnet", "LitigApp.Api.dll"]
+ENV LITIGAPP_ROLE=api
+ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet LitigApp.Api.dll"]
 ```
 
 `Dockerfile.worker` — Worker Hangfire que NO expone HTTP:
