@@ -17,8 +17,8 @@ internal sealed class ProcessRepository(AppDbContext db) : IProcessRepository
 
         return db.Processes
             .Where(p => p.IsActive &&
-                (p.SyncPhase == "pending_overview" ||
-                 (p.SyncPhase == "idle" && (p.LastSyncedAt == null || p.LastSyncedAt < cutoff))))
+                (p.SyncPhase == ProcessSyncPhase.PendingOverview ||
+                 (p.SyncPhase == ProcessSyncPhase.Idle && (p.LastSyncedAt == null || p.LastSyncedAt < cutoff))))
             .OrderBy(p => p.LastSyncAttemptAt == null ? DateTimeOffset.MinValue : p.LastSyncAttemptAt.Value)
             .Take(batchSize)
             .ToListAsync(ct);  // tracked — we modify these entities immediately after
@@ -26,7 +26,7 @@ internal sealed class ProcessRepository(AppDbContext db) : IProcessRepository
 
     public Task<List<Process>> GetPendingActionsAsync(int batchSize, CancellationToken ct) =>
         db.Processes
-            .Where(p => p.IsActive && p.SyncPhase == "pending_actions")
+            .Where(p => p.IsActive && p.SyncPhase == ProcessSyncPhase.PendingActions)
             .OrderBy(p => p.LastSyncAttemptAt == null ? DateTimeOffset.MinValue : p.LastSyncAttemptAt.Value)
             .Take(batchSize)
             .ToListAsync(ct);  // tracked — modified in the sweep loop

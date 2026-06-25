@@ -110,7 +110,7 @@ public sealed class ActionsSweepJob(
                 changed++;
             }
 
-            process.SyncPhase = "idle";
+            process.SyncPhase = ProcessSyncPhase.Idle;
             process.SyncStatus = ProcessSyncStatus.Ok;
             process.SyncError = null;
             process.LastSyncedAt = now;
