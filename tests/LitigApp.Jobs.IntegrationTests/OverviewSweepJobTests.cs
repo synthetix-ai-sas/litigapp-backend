@@ -218,6 +218,7 @@ public sealed class OverviewSweepJobTests : IAsyncLifetime
             repo,
             client,
             new SyncStateService(_db, clock),
+            new RecordingSyncJobScheduler(),
             opts,
             Options.Create(new WafOptions()),
             clock,

@@ -54,7 +54,7 @@ public class ProcessConfiguration : IEntityTypeConfiguration<Process>
         builder.Property(p => p.SyncPhase)
             .IsRequired()
             .HasColumnType("text")
-            .HasDefaultValue("pending_initial_full");
+            .HasDefaultValue(ProcessSyncPhase.PendingInitialFull);
 
         builder.Property(p => p.SyncError).HasColumnType("text");
 

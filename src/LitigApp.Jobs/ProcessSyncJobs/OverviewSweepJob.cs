@@ -12,6 +12,7 @@ public sealed class OverviewSweepJob(
     IProcessRepository processRepository,
     IRamaJudicialClient ramaClient,
     ISyncStateService syncState,
+    ISyncJobScheduler scheduler,
     IOptions<SweepOptions> sweepOptions,
     IOptions<WafOptions> wafOptions,
     IDateTimeProvider clock,
@@ -60,14 +61,14 @@ public sealed class OverviewSweepJob(
                 var overview = result.Value;
                 if (overview is null)
                 {
-                    process.SyncPhase = "idle";
+                    process.SyncPhase = ProcessSyncPhase.Idle;
                     process.SyncStatus = ProcessSyncStatus.NotFound;
                     notFound++;
                 }
                 else if (overview.LastActionDate.HasValue &&
                          new DateTimeOffset(overview.LastActionDate.Value, TimeSpan.Zero) > process.LastCourtActionAt)
                 {
-                    process.SyncPhase = "pending_actions";
+                    process.SyncPhase = ProcessSyncPhase.PendingActions;
                     process.LastCourtActionAt = new DateTimeOffset(overview.LastActionDate.Value, TimeSpan.Zero);
                     process.ExternalProcessId ??= overview.ExternalProcessId;
                     process.ExternalConnectionId ??= overview.ExternalConnectionId;
@@ -75,7 +76,7 @@ public sealed class OverviewSweepJob(
                 }
                 else
                 {
-                    process.SyncPhase = "idle";
+                    process.SyncPhase = ProcessSyncPhase.Idle;
                     process.SyncStatus = ProcessSyncStatus.Ok;
                     process.LastSyncedAt = now;
                     process.ExternalProcessId ??= overview.ExternalProcessId;
@@ -92,7 +93,7 @@ public sealed class OverviewSweepJob(
                 switch (failure.Kind)
                 {
                     case FailureKind.NotFound:
-                        process.SyncPhase = "idle";
+                        process.SyncPhase = ProcessSyncPhase.Idle;
                         process.SyncStatus = ProcessSyncStatus.NotFound;
                         notFound++;
                         processed++;
@@ -142,6 +143,13 @@ public sealed class OverviewSweepJob(
             }
 
             await processRepository.SaveChangesAsync(ct);
+        }
+
+        // Trigger ActionsSweep if this run marked any process pending_actions.
+        if (changed > 0)
+        {
+            logger.LogInformation("OverviewSweepJob enqueuing ActionsSweep ({Changed} changed).", changed);
+            scheduler.EnqueueActionsSweep();
         }
 
         var elapsed = clock.UtcNow - startedAt;

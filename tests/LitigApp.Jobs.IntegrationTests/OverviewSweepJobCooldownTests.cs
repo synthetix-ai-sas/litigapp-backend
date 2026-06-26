@@ -146,6 +146,7 @@ public sealed class OverviewSweepJobCooldownTests : IAsyncLifetime
         new ProcessRepository(_db),
         client,
         new SyncStateService(_db, _clock),
+        new RecordingSyncJobScheduler(),
         Options.Create(new SweepOptions { BatchSize = 100, MinimumHoursBetweenSyncsPerProcess = 22 }),
         Options.Create(new WafOptions()),
         _clock,

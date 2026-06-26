@@ -1,4 +1,5 @@
 using Hangfire;
+using LitigApp.Application.Common.Abstractions;
 using LitigApp.Jobs.ProcessSyncJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,7 +53,10 @@ public static class DependencyInjection
                 : 2;
         });
 
+        services.AddScoped<ISyncJobScheduler, HangfireSyncJobScheduler>();
         services.AddScoped<OverviewSweepJob>();
+        services.AddScoped<ActionsSweepJob>();
+        services.AddScoped<DispatchUserNotificationsJob>();
 
         if (isWorker)
         {
