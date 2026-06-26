@@ -1,0 +1,24 @@
+# Railway config for the litigapp-api service.
+# Point this service's "Config File Path" to railway.api.toml in the Railway dashboard.
+#
+# Secrets that must be set in the Railway dashboard (never here):
+#   ConnectionStrings__Postgres   — Supabase connection string
+#   Jwt__Secret                   — min 32 chars, generate with: openssl rand -hex 32
+#   Hangfire__DashboardPassword   — password for /hangfire Basic Auth prompt
+
+[build]
+dockerfilePath = "Dockerfile.api"
+
+[deploy]
+# Runs EF Core migrations before the new deploy takes traffic.
+preDeployCommand = "./efbundle"
+healthcheckPath  = "/health"
+healthcheckTimeout = 300
+restartPolicyType       = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[variables]
+# Non-secret production values. Local dev overrides these via appsettings.Development.json.
+Cors__AllowedOrigins__0 = "https://app.litigapp.co"
+Jwt__Issuer             = "https://api.litigapp.co"
+Jwt__Audience           = "https://app.litigapp.co"
