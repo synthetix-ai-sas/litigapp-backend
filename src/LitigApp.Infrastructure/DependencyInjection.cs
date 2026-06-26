@@ -25,7 +25,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool isWorker)
     {
         // ── Database ──────────────────────────────────────────────────────────
         var connectionString = configuration.GetConnectionString("Postgres")
@@ -36,34 +37,35 @@ public static class DependencyInjection
                 .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention());
 
-
-        // ── JWT Options ───────────────────────────────────────────────────────
-        services.AddOptions<JwtOptions>()
-            .BindConfiguration(JwtOptions.SectionName)
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
-        // ── Auth services ─────────────────────────────────────────────────────
-        services.AddHttpContextAccessor();
-        services.AddScoped<IJwtTokenService, JwtTokenService>();
-        services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IEmailSender, NoOpEmailSender>();
-        services.AddScoped<IIdentityService, IdentityService>();
-        services.AddScoped<IAuthRepository, AuthRepository>();
 
-        // ── ASP.NET Core Identity ─────────────────────────────────────────────
-        services.AddIdentity<ApplicationUser, IdentityRole>(options =>
-            {
-                options.Password.RequiredLength = 8;
-                options.Password.RequireDigit = true;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireUppercase = false;
-                options.Password.RequireNonAlphanumeric = false;
-                options.User.RequireUniqueEmail = true;
-                options.SignIn.RequireConfirmedEmail = false; // set to true in production
-            })
-            .AddEntityFrameworkStores<AppDbContext>()
-            .AddDefaultTokenProviders();
+        // JWT/Identity — api role only; the worker never issues/validates tokens.
+        if (!isWorker)
+        {
+            services.AddOptions<JwtOptions>()
+                .BindConfiguration(JwtOptions.SectionName)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddHttpContextAccessor();
+            services.AddScoped<IJwtTokenService, JwtTokenService>();
+            services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddScoped<IIdentityService, IdentityService>();
+            services.AddScoped<IAuthRepository, AuthRepository>();
+
+            services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+                {
+                    options.Password.RequiredLength = 8;
+                    options.Password.RequireDigit = true;
+                    options.Password.RequireLowercase = true;
+                    options.Password.RequireUppercase = false;
+                    options.Password.RequireNonAlphanumeric = false;
+                    options.User.RequireUniqueEmail = true;
+                    options.SignIn.RequireConfirmedEmail = false; // set to true in production
+                })
+                .AddEntityFrameworkStores<AppDbContext>()
+                .AddDefaultTokenProviders();
+        }
 
         // ── Time ──────────────────────────────────────────────────────────────
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();

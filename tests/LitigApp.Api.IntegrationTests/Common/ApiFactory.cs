@@ -24,6 +24,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Postgres"] = _postgres.GetConnectionString(),
+                // appsettings.json no longer carries a placeholder Jwt:Secret (it's required
+                // at startup so production fails fast instead of silently using one). Local
+                // dev gets it from gitignored appsettings.Development.json, which CI doesn't
+                // have, so tests need their own value here.
+                ["Jwt:Secret"] = "test-only-secret-never-used-to-sign-anything-real-32chars",
             });
         });
 

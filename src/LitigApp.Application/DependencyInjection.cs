@@ -30,37 +30,41 @@ namespace LitigApp.Application;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApplication(this IServiceCollection services)
+    public static IServiceCollection AddApplication(this IServiceCollection services, bool isWorker)
     {
-        // Auth command handlers
-        services.AddScoped<ICommandHandler<RegisterCommand, AuthTokensResponse>, RegisterCommandHandler>();
-        services.AddScoped<ICommandHandler<LoginCommand, AuthTokensResponse>, LoginCommandHandler>();
-        services.AddScoped<ICommandHandler<RefreshTokenCommand, AuthTokensResponse>, RefreshTokenCommandHandler>();
-        services.AddScoped<ICommandHandler<RequestPasswordResetCommand, Unit>, RequestPasswordResetCommandHandler>();
-        services.AddScoped<ICommandHandler<ResetPasswordCommand, Unit>, ResetPasswordCommandHandler>();
+        // Only the api role's HTTP endpoints call these; worker jobs hit Infrastructure directly.
+        if (!isWorker)
+        {
+            // Auth command handlers
+            services.AddScoped<ICommandHandler<RegisterCommand, AuthTokensResponse>, RegisterCommandHandler>();
+            services.AddScoped<ICommandHandler<LoginCommand, AuthTokensResponse>, LoginCommandHandler>();
+            services.AddScoped<ICommandHandler<RefreshTokenCommand, AuthTokensResponse>, RefreshTokenCommandHandler>();
+            services.AddScoped<ICommandHandler<RequestPasswordResetCommand, Unit>, RequestPasswordResetCommandHandler>();
+            services.AddScoped<ICommandHandler<ResetPasswordCommand, Unit>, ResetPasswordCommandHandler>();
 
-        // Catalog query handlers
-        services.AddScoped<IQueryHandler<ListDepartmentsQuery, List<DepartmentDto>>, ListDepartmentsHandler>();
-        services.AddScoped<IQueryHandler<ListCitiesByDepartmentQuery, List<CityDto>>, ListCitiesByDepartmentHandler>();
-        services.AddScoped<IQueryHandler<ListSpecialtiesQuery, List<SpecialtyDto>>, ListSpecialtiesHandler>();
-        services.AddScoped<IQueryHandler<ListEntitiesQuery, List<EntityDto>>, ListEntitiesHandler>();
-        services.AddScoped<IQueryHandler<ListCourtsByCityQuery, List<CourtDto>>, ListCourtsByCityHandler>();
-        services.AddScoped<IQueryHandler<SearchCourtsQuery, List<CourtDto>>, SearchCourtsHandler>();
+            // Catalog query handlers
+            services.AddScoped<IQueryHandler<ListDepartmentsQuery, List<DepartmentDto>>, ListDepartmentsHandler>();
+            services.AddScoped<IQueryHandler<ListCitiesByDepartmentQuery, List<CityDto>>, ListCitiesByDepartmentHandler>();
+            services.AddScoped<IQueryHandler<ListSpecialtiesQuery, List<SpecialtyDto>>, ListSpecialtiesHandler>();
+            services.AddScoped<IQueryHandler<ListEntitiesQuery, List<EntityDto>>, ListEntitiesHandler>();
+            services.AddScoped<IQueryHandler<ListCourtsByCityQuery, List<CourtDto>>, ListCourtsByCityHandler>();
+            services.AddScoped<IQueryHandler<SearchCourtsQuery, List<CourtDto>>, SearchCourtsHandler>();
 
-        // Process query handlers
-        services.AddScoped<IQueryHandler<ListNoveltiesQuery, PagedResult<ProcessListItemDto>>, ListNoveltiesHandler>();
-        services.AddScoped<IQueryHandler<ListProcessesQuery, PagedResult<ProcessListItemDto>>, ListProcessesHandler>();
-        services.AddScoped<IQueryHandler<GetProcessByIdQuery, ProcessDetailDto?>, GetProcessByIdHandler>();
+            // Process query handlers
+            services.AddScoped<IQueryHandler<ListNoveltiesQuery, PagedResult<ProcessListItemDto>>, ListNoveltiesHandler>();
+            services.AddScoped<IQueryHandler<ListProcessesQuery, PagedResult<ProcessListItemDto>>, ListProcessesHandler>();
+            services.AddScoped<IQueryHandler<GetProcessByIdQuery, ProcessDetailDto?>, GetProcessByIdHandler>();
 
-        // Process command handlers (+ shared creation service)
-        services.AddScoped<ProcessCreationService>();
-        services.AddScoped<ICommandHandler<CreateProcessFromFileNumberCommand, ProcessDetailDto>, CreateProcessFromFileNumberHandler>();
-        services.AddScoped<ICommandHandler<CreateProcessFromWizardCommand, ProcessDetailDto>, CreateProcessFromWizardHandler>();
-        services.AddScoped<ICommandHandler<MarkAttendedCommand, Unit>, MarkAttendedHandler>();
-        services.AddScoped<ICommandHandler<SoftDeleteProcessCommand, Unit>, SoftDeleteProcessHandler>();
+            // Process command handlers (+ shared creation service)
+            services.AddScoped<ProcessCreationService>();
+            services.AddScoped<ICommandHandler<CreateProcessFromFileNumberCommand, ProcessDetailDto>, CreateProcessFromFileNumberHandler>();
+            services.AddScoped<ICommandHandler<CreateProcessFromWizardCommand, ProcessDetailDto>, CreateProcessFromWizardHandler>();
+            services.AddScoped<ICommandHandler<MarkAttendedCommand, Unit>, MarkAttendedHandler>();
+            services.AddScoped<ICommandHandler<SoftDeleteProcessCommand, Unit>, SoftDeleteProcessHandler>();
 
-        // Decorate all ICommandHandler<,> registrations with LoggingBehavior (Commands only — not Queries)
-        services.Decorate(typeof(ICommandHandler<,>), typeof(LoggingBehavior<,>));
+            // Decorate all ICommandHandler<,> registrations with LoggingBehavior (Commands only — not Queries)
+            services.Decorate(typeof(ICommandHandler<,>), typeof(LoggingBehavior<,>));
+        }
 
         return services;
     }
