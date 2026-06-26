@@ -19,4 +19,11 @@ public sealed class RecordingSyncJobScheduler : ISyncJobScheduler
     }
 
     public void EnqueueUserNotifications(string userId) => NotifiedUserIds.Add(userId);
+
+    public int PartialFetchEnqueued { get; private set; }
+    public int PartialFetchScheduled { get; private set; }
+
+    public void EnqueuePartialFetch(Guid processId) => PartialFetchEnqueued++;
+
+    public void SchedulePartialFetch(Guid processId, TimeSpan delay) => PartialFetchScheduled++;
 }

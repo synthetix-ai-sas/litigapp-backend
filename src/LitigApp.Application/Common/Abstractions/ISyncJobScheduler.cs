@@ -14,4 +14,10 @@ public interface ISyncJobScheduler
 
     /// <summary>Triggers the (aggregated) notification dispatch for a single user.</summary>
     void EnqueueUserNotifications(string userId);
+
+    /// <summary>Triggers completion of a process left partial by synchronous creation.</summary>
+    void EnqueuePartialFetch(Guid processId);
+
+    /// <summary>Schedules a partial-fetch completion after <paramref name="delay"/> (WAF cooldown resume).</summary>
+    void SchedulePartialFetch(Guid processId, TimeSpan delay);
 }

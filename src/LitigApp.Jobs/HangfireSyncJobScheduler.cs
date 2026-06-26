@@ -15,4 +15,10 @@ internal sealed class HangfireSyncJobScheduler(IBackgroundJobClient client) : IS
 
     public void EnqueueUserNotifications(string userId) =>
         client.Enqueue<DispatchUserNotificationsJob>(j => j.RunAsync(userId, CancellationToken.None));
+
+    public void EnqueuePartialFetch(Guid processId) =>
+        client.Enqueue<CompletePartialFetchJob>(j => j.RunAsync(processId, CancellationToken.None));
+
+    public void SchedulePartialFetch(Guid processId, TimeSpan delay) =>
+        client.Schedule<CompletePartialFetchJob>(j => j.RunAsync(processId, CancellationToken.None), delay);
 }
