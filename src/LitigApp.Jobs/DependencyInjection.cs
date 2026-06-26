@@ -54,9 +54,11 @@ public static class DependencyInjection
         });
 
         services.AddScoped<ISyncJobScheduler, HangfireSyncJobScheduler>();
+        services.AddScoped<IPartialFetchScheduler, SyncPartialFetchScheduler>();
         services.AddScoped<OverviewSweepJob>();
         services.AddScoped<ActionsSweepJob>();
         services.AddScoped<DispatchUserNotificationsJob>();
+        services.AddScoped<CompletePartialFetchJob>();
 
         if (isWorker)
         {

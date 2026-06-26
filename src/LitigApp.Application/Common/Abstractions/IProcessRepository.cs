@@ -19,6 +19,9 @@ public interface IProcessRepository
     /// <summary>Stages new action rows to be persisted on the next SaveChanges.</summary>
     Task AddActionsAsync(IEnumerable<ProcessAction> actions, CancellationToken ct);
 
+    /// <summary>Stages new subject rows to be persisted on the next SaveChanges.</summary>
+    Task AddSubjectsAsync(IEnumerable<ProcessSubject> subjects, CancellationToken ct);
+
     /// <summary>True if the user already has a process with this file number (active or not).</summary>
     Task<bool> ExistsAsync(string userId, string fileNumber, CancellationToken ct);
 
@@ -36,6 +39,12 @@ public interface IProcessRepository
 
     /// <summary>Gets a tracked process owned by the user, or null. Use for mutations.</summary>
     Task<Process?> GetOwnedAsync(Guid id, string userId, CancellationToken ct);
+
+    /// <summary>Gets a tracked process by id (no owner filter) for system jobs. Null if not found.</summary>
+    Task<Process?> GetByIdAsync(Guid id, CancellationToken ct);
+
+    /// <summary>True if the process already has at least one subject row.</summary>
+    Task<bool> HasSubjectsAsync(Guid processId, CancellationToken ct);
 
     Task SaveChangesAsync(CancellationToken ct);
 }

@@ -83,20 +83,7 @@ public sealed class ProcessCreationService(
         if (subjectsResult.IsSuccess && subjectsResult.Value is { } subjects)
         {
             foreach (var s in subjects)
-            {
-                process.Subjects.Add(new ProcessSubject
-                {
-                    Id = Guid.NewGuid(),
-                    ProcessId = process.Id,
-                    ExternalSubjectId = s.ExternalSubjectId,
-                    SubjectType = s.SubjectType,
-                    IsSummoned = s.IsServedByPublication,
-                    Identification = s.Identification,
-                    Name = s.FullName,
-                    Source = "api",
-                    CreatedAt = now,
-                });
-            }
+                process.Subjects.Add(ProcessSubjectFactory.Create(s, process.Id, now));
         }
         else
         {

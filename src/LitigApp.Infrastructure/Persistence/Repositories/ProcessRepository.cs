@@ -39,6 +39,9 @@ internal sealed class ProcessRepository(AppDbContext db) : IProcessRepository
     public async Task AddActionsAsync(IEnumerable<ProcessAction> actions, CancellationToken ct) =>
         await db.ProcessActions.AddRangeAsync(actions, ct);
 
+    public async Task AddSubjectsAsync(IEnumerable<ProcessSubject> subjects, CancellationToken ct) =>
+        await db.ProcessSubjects.AddRangeAsync(subjects, ct);
+
     public Task<bool> ExistsAsync(string userId, string fileNumber, CancellationToken ct) =>
         db.Processes.AsNoTracking().AnyAsync(p => p.UserId == userId && p.FileNumber == fileNumber, ct);
 
@@ -59,6 +62,12 @@ internal sealed class ProcessRepository(AppDbContext db) : IProcessRepository
 
     public Task<Process?> GetOwnedAsync(Guid id, string userId, CancellationToken ct) =>
         db.Processes.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId, ct);
+
+    public Task<Process?> GetByIdAsync(Guid id, CancellationToken ct) =>
+        db.Processes.FirstOrDefaultAsync(p => p.Id == id, ct);  // tracked — mutated by the job
+
+    public Task<bool> HasSubjectsAsync(Guid processId, CancellationToken ct) =>
+        db.ProcessSubjects.AsNoTracking().AnyAsync(s => s.ProcessId == processId, ct);
 
     public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }
