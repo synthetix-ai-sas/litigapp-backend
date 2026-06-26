@@ -182,7 +182,9 @@ public sealed class ActionsSweepJobTests : IAsyncLifetime
         client,
         new SyncStateService(_db, _clock),
         scheduler,
+        new NoOpSyncDelay(),
         Options.Create(new SweepOptions { BatchSize = 100, MinimumHoursBetweenSyncsPerProcess = 22 }),
+        Options.Create(new ThrottleOptions()),
         Options.Create(new WafOptions()),
         _clock,
         NullLogger<ActionsSweepJob>.Instance);

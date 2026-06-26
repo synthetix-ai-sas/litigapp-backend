@@ -76,6 +76,20 @@ public sealed class SyncStateServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SetWafBlockedUntil_WithEarlierValue_KeepsTheLaterCooldown()
+    {
+        var svc = BuildService();
+        var later = DateTimeOffset.UtcNow.AddMinutes(20);
+        var earlier = DateTimeOffset.UtcNow.AddMinutes(5);
+
+        await svc.SetWafBlockedUntilAsync(later, "first 403", CancellationToken.None);
+        await svc.SetWafBlockedUntilAsync(earlier, "second 403", CancellationToken.None);
+
+        var result = await svc.GetWafBlockedUntilAsync(CancellationToken.None);
+        result!.Value.Should().BeCloseTo(later, TimeSpan.FromSeconds(1)); // not shortened
+    }
+
+    [Fact]
     public async Task GetOverviewThrottleSeconds_WhenSeeded_ReturnsThree()
     {
         var svc = BuildService();

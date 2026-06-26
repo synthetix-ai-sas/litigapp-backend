@@ -21,6 +21,7 @@ public class ActionsSweepJobUnitTests
     private readonly IRamaJudicialClient _client = Substitute.For<IRamaJudicialClient>();
     private readonly ISyncStateService _syncState = Substitute.For<ISyncStateService>();
     private readonly ISyncJobScheduler _scheduler = Substitute.For<ISyncJobScheduler>();
+    private readonly ISyncDelay _delay = Substitute.For<ISyncDelay>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
 
     public ActionsSweepJobUnitTests() => _clock.UtcNow.Returns(Now.UtcDateTime);
@@ -111,6 +112,22 @@ public class ActionsSweepJobUnitTests
         Assert.Equal(ProcessSyncPhase.PendingActions, process.SyncPhase);
     }
 
+    [Fact]
+    public async Task PacesBetweenProcesses_ButNotBeforeTheFirst()
+    {
+        var p1 = Pending("user-1", externalId: 999);
+        var p2 = Pending("user-2", externalId: 998);
+        StubPending(p1, p2);
+        StubExisting(p1.Id);
+        StubExisting(p2.Id);
+        _client.GetFirstPageActionsAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(RamaResult<List<ActionData>>.Ok([]));
+
+        await BuildJob().RunAsync();
+
+        await _delay.Received(1).WaitAsync(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
+    }
+
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private void StubPending(params Process[] processes) =>
@@ -145,8 +162,9 @@ public class ActionsSweepJobUnitTests
         new(id, consecutive, Recorded, type, null, null, null, Recorded, null, false);
 
     private ActionsSweepJob BuildJob() => new(
-        _repo, _client, _syncState, _scheduler,
+        _repo, _client, _syncState, _scheduler, _delay,
         Options.Create(new SweepOptions { BatchSize = 100, MinimumHoursBetweenSyncsPerProcess = 22 }),
+        Options.Create(new ThrottleOptions()),
         Options.Create(new WafOptions()),
         _clock,
         NullLogger<ActionsSweepJob>.Instance);

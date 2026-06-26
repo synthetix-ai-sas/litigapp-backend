@@ -69,6 +69,7 @@ public static class DependencyInjection
 
         // ── Time ──────────────────────────────────────────────────────────────
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
+        services.AddSingleton<ISyncDelay, RealSyncDelay>();
 
         // ── Rama Judicial HTTP client ─────────────────────────────────────────
         services.Configure<RamaJudicialOptions>(
