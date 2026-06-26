@@ -1,0 +1,14 @@
+# Railway config for the litigapp-worker service.
+# Point this service's "Config File Path" to railway.worker.toml in the Railway dashboard.
+#
+# Secrets that must be set in the Railway dashboard (never here):
+#   ConnectionStrings__Postgres   — same Supabase string as the api service
+
+[build]
+dockerfilePath = "Dockerfile.worker"
+
+[deploy]
+# No preDeployCommand — migrations are handled by the api service's pre-deploy step.
+# No healthcheckPath  — worker has no HTTP surface.
+restartPolicyType       = "ON_FAILURE"
+restartPolicyMaxRetries = 3
