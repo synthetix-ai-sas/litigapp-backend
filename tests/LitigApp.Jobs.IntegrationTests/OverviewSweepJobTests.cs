@@ -219,7 +219,9 @@ public sealed class OverviewSweepJobTests : IAsyncLifetime
             client,
             new SyncStateService(_db, clock),
             new RecordingSyncJobScheduler(),
+            new NoOpSyncDelay(),
             opts,
+            Options.Create(new ThrottleOptions()),
             Options.Create(new WafOptions()),
             clock,
             NullLogger<OverviewSweepJob>.Instance);

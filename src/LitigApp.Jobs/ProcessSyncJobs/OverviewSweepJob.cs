@@ -13,7 +13,9 @@ public sealed class OverviewSweepJob(
     IRamaJudicialClient ramaClient,
     ISyncStateService syncState,
     ISyncJobScheduler scheduler,
+    ISyncDelay syncDelay,
     IOptions<SweepOptions> sweepOptions,
+    IOptions<ThrottleOptions> throttleOptions,
     IOptions<WafOptions> wafOptions,
     IDateTimeProvider clock,
     ILogger<OverviewSweepJob> logger)
@@ -22,6 +24,7 @@ public sealed class OverviewSweepJob(
     {
         var opts = sweepOptions.Value;
         var waf = wafOptions.Value;
+        var throttleOpts = throttleOptions.Value;
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         var startedAt = clock.UtcNow;
 
@@ -34,9 +37,13 @@ public sealed class OverviewSweepJob(
             return;
         }
 
+        // Adaptive throttle (decision D1): the job paces itself using this value from
+        // sync_state; the HTTP client only enforces a minimal safety floor.
+        var throttleSeconds = await syncState.GetOverviewThrottleSecondsAsync(ct);
+
         logger.LogInformation(
-            "OverviewSweepJob starting. BatchSize={BatchSize} MinimumHoursBetweenSyncs={Hours}h",
-            opts.BatchSize, opts.MinimumHoursBetweenSyncsPerProcess);
+            "OverviewSweepJob starting. BatchSize={BatchSize} MinimumHoursBetweenSyncs={Hours}h Throttle={Throttle}s",
+            opts.BatchSize, opts.MinimumHoursBetweenSyncsPerProcess, throttleSeconds);
 
         var processes = await processRepository.GetEligibleForOverviewSweepAsync(
             opts.BatchSize,
@@ -48,9 +55,14 @@ public sealed class OverviewSweepJob(
         int processed = 0, changed = 0, noChange = 0, notFound = 0, errors = 0;
         bool wafTriggered = false;
 
+        var first = true;
         foreach (var process in processes)
         {
             if (ct.IsCancellationRequested || wafTriggered) break;
+
+            if (!first)
+                await syncDelay.WaitAsync(PaceDelay(throttleSeconds, throttleOpts), ct);
+            first = false;
 
             process.LastSyncAttemptAt = now;
 
@@ -152,10 +164,39 @@ public sealed class OverviewSweepJob(
             scheduler.EnqueueActionsSweep();
         }
 
+        await AdjustThrottleAsync(throttleSeconds, wafTriggered, processed, waf, throttleOpts, ct);
+
         var elapsed = clock.UtcNow - startedAt;
         logger.LogInformation(
             "OverviewSweepJob finished in {ElapsedMs:0}ms. " +
             "Processed={Processed} Changed={Changed} NoChange={NoChange} NotFound={NotFound} Errors={Errors} WafAborted={WafTriggered}",
             elapsed.TotalMilliseconds, processed, changed, noChange, notFound, errors, wafTriggered);
+    }
+
+    /// <summary>
+    /// Adaptive throttle (blueprint §10.1 step 5): a blocked run slows down (+2, capped at
+    /// the emergency ceiling); a clean run that processed enough speeds up (-1, floored at
+    /// the configured minimum). Otherwise unchanged.
+    /// </summary>
+    private async Task AdjustThrottleAsync(
+        int current, bool blocked, int processed, WafOptions waf, ThrottleOptions throttleOpts, CancellationToken ct)
+    {
+        var next = blocked
+            ? Math.Min(current + 2, waf.EmergencyMaxThrottleSeconds)
+            : processed >= waf.ConsecutiveSuccessesToSpeedUp
+                ? Math.Max(current - 1, throttleOpts.OverviewIntervalSecondsMin)
+                : current;
+
+        if (next == current)
+            return;
+
+        await syncState.SetOverviewThrottleSecondsAsync(next, ct);
+        logger.LogInformation("OverviewSweepJob adaptive throttle {Old}s -> {New}s.", current, next);
+    }
+
+    private static TimeSpan PaceDelay(int throttleSeconds, ThrottleOptions opts)
+    {
+        var jitterMaxMs = Math.Max(1, (opts.OverviewIntervalSecondsMax - opts.OverviewIntervalSecondsMin) * 1000);
+        return TimeSpan.FromSeconds(throttleSeconds) + TimeSpan.FromMilliseconds(Random.Shared.Next(0, jitterMaxMs));
     }
 }

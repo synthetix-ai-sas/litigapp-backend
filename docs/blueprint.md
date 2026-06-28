@@ -274,14 +274,15 @@ litigapp-backend/
 │   │
 │   ├── LitigApp.Jobs/                          # csproj — referencia: Application, Infrastructure
 │   │   ├── ProcessSyncJobs/
-│   │   │   ├── OverviewSweepJob.cs             # recurrente cada 15min — overview de todos los procesos activos
-│   │   │   ├── ActionsSweepJob.cs              # encolado por OverviewSweep si hay pending_actions
-│   │   │   ├── CompletePartialFetchJob.cs      # encolado si creación individual quedó parcial por WAF
-│   │   │   └── BulkImportJob.cs                # encolado por POST /imports — hasta 5000 filas
+│   │   │   ├── OverviewSweepJob.cs             # RecurringJob cada Sweep.OverviewIntervalMinutes (default 15min) — solo overview
+│   │   │   ├── ActionsSweepJob.cs              # encolado por OverviewSweep — actuaciones pág.1 de los procesos con cambios
+│   │   │   └── CompletePartialFetchJob.cs      # encolado tras creación/import parcial — completa endpoints faltantes
 │   │   ├── NotificationJobs/
-│   │   │   ├── DispatchUserNotificationsJob.cs # triggered al final de ActionsSweep por cada usuario con cambios
-│   │   │   ├── DispatchImportCompleteJob.cs    # triggered al final de BulkImport — email de resumen
-│   │   │   └── NotificationFallbackSweepJob.cs # recurrente cada hora — reintenta outbox huérfanos
+│   │   │   ├── DispatchUserNotificationsJob.cs # triggered por sync — 1 email digest por usuario
+│   │   │   ├── DispatchImportCompleteJob.cs    # triggered al terminar un import
+│   │   │   └── NotificationFallbackSweepJob.cs # RecurringJob cada hora — recoge outbox pendiente (NO cada 5 min)
+│   │   ├── ImportJobs/
+│   │   │   └── BulkImportJob.cs                # encolado por POST /imports — procesa Excel
 │   │   ├── MaintenanceJobs/
 │   │   │   ├── OutboxCleanupJob.cs             # semanal — borra outbox 'sent' > 30 días
 │   │   │   └── ImportJobsCleanupJob.cs         # semanal — borra import_jobs > 90 días
@@ -357,7 +358,7 @@ litigapp-web/
 └── src/
     ├── main.ts
     ├── index.html
-    ├── styles.css                              # @tailwind base/components/utilities
+    ├── styles.css                              # Tailwind v4: @import "tailwindcss"; + @theme con tokens (NO @tailwind base/components/utilities — eso es v3)
     ├── environments/
     │   ├── environment.ts                      # apiUrl placeholder
     │   └── environment.prod.ts
@@ -726,7 +727,7 @@ CREATE TABLE import_jobs (
   success_count integer NOT NULL DEFAULT 0,
   error_count integer NOT NULL DEFAULT 0,
   status text NOT NULL DEFAULT 'pending',          -- pending|running|completed|failed
-  column_mapping jsonb,                            -- { fileNumberCol: 'A', cityCol: 'B', ... }
+  column_mapping jsonb,                            -- v1: { radicadoCol: 'B', notesCol: 'I' } (radicado obligatorio, notas opcional)
   errors jsonb,                                    -- [{ row: 5, message: '...' }, ...]
   created_at timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz
@@ -1637,7 +1638,7 @@ Extraído directamente del mockup aprobado (`litigapp_mockup.tsx`).
 
 ### Tipografía
 
-- **Familia**: Inter (Tailwind default font-sans con configuración explícita en `tailwind.config.js`).
+- **Familia**: Inter, declarada en el bloque `@theme` de `styles.css` con `--font-sans: "Inter", ...` (Tailwind v4 es CSS-first; **no** hay `tailwind.config.js`).
 - **Escalas**: `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`, `text-2xl`.
 - **Pesos**: 400 (body), 500 (medium / labels), 600 (semibold / headings), 700 (bold / títulos grandes).
 
@@ -2382,10 +2383,26 @@ Crear `Directory.Build.props` con:
 6. `GET /imports/{id}` — opcional, solo para consulta directa de un job específico (link desde email, historial). No se usa en el flujo principal.
 7. `BulkImportJob`:
    - `UPDATE import_jobs SET status='running'` al inicio.
-   - Por cada fila: validar/construir radicado → si OK, llamar a los 4 endpoints síncronamente (rate-limit 2/seg por usuario) → persistir.
-   - `attended=true` (es importación, no novedad).
+   - Por cada fila, aplica la **estrategia de importación v1** (ver abajo).
+   - Las filas importadas quedan `attended=true` (es importación, no novedad).
    - **Actualiza `processed_rows`, `success_count`, `error_count` cada 5 filas** para que el polling tenga datos frescos.
    - Al terminar: `status='completed'`, `completed_at=now`, inserta outbox con `event_type='ImportComplete', channel='email'`.
+
+**Estrategia de importación v1 — "radicado-first", best-effort** (validada contra un Excel real de un abogado en ejercicio):
+
+- **Mapeo de columnas dirigido por el usuario.** Cada abogado nombra y ordena sus columnas distinto (incluso puede no ser Excel), así que el sistema NO hardcodea posiciones. El usuario mapea:
+  - **Obligatorio:** la columna del **radicado**.
+  - **Opcional:** la columna de **notas/observaciones** (se guarda como nota del proceso).
+- **Por cada fila:**
+  1. Lee la columna de radicado y **normaliza**: quita espacios, guiones, tabs y todo no-dígito.
+  2. ¿Quedan **exactamente 23 dígitos**?
+     - **Sí** → importar vía flujo full-number (4 endpoints; la API + los primeros 5 dígitos DANE llenan depto/municipio/despacho). Se ignora cualquier otra columna de ubicación.
+     - **No** (vacío, SIC tipo `25-463759-0`, penal/Fiscalía de 21 díg., basura) → **NO se intenta reconstruir**. La fila va a la **lista de errores** con `error.code='INVALID_RADICADO'` para carga manual con el wizard.
+  3. **Filas vacías y filas de sección/encabezado** (sin radicado en la columna mapeada) → **se saltan en silencio**; NO cuentan como error.
+- **`column_mapping` es extensible por diseño:** el shape v1 es `{ radicadoCol, notesCol }`, pero la estructura admite a futuro `{ yearCol, sequenceCol, deptCol, cityCol, courtCol, ... }` sin romper nada. El frontend solo expone radicado (obligatorio) + notas (opcional) en v1.
+- **Importación "por partes" → v2 (no v1):** la idea de mapear año/consecutivo/depto/municipio/juzgado y reconstruir el radicado es válida, pero el cuello de botella NO es año/consecutivo (esos son fáciles) sino resolver el **`official_code` (12 díg.) del despacho**: el Excel del abogado trae un *nombre* de juzgado, no su código, y depto+municipio no identifican un juzgado único. Eso obliga a **matching difuso del nombre del juzgado** contra el catálogo `courts`, cuyo riesgo es importar el **proceso equivocado en silencio** (radicado válido del despacho incorrecto) — inaceptable en una herramienta legal. Por eso se difiere a v2 y, cuando se haga, será con **match exacto normalizado + paso de confirmación humana** antes de importar, nunca fuzzy a ciegas. En v1, toda fila sin radicado de 23 díg. válido → carga manual con el wizard.
+- **Formato/encoding:** soportar **`.xlsx` vía ClosedXML** (interno UTF-8, sin romper acentos). `.csv` (Windows-1252, rompe `Villamar�a`) fuera de MVP.
+- **Fuera de la Rama Judicial:** procesos de la SIC y penales (Fiscalía) no están en la API; caen naturalmente a manual por no tener radicado de 23 díg. La app no los monitorea automáticamente en v1.
 
 **Flujo en el frontend** (importante):
 
@@ -2498,21 +2515,48 @@ Esto deja la arquitectura preparada sin costo de tiempo ni dinero en MVP.
 ```bash
 pnpm dlx @angular/cli@20 new litigapp-web --routing --style=css --ssr=false --strict --standalone
 cd litigapp-web
-pnpm add -D tailwindcss @tailwindcss/postcss postcss autoprefixer
+pnpm add -D tailwindcss @tailwindcss/postcss   # Tailwind v4 — NO autoprefixer (v4 lo incluye)
 pnpm add lucide-angular @capacitor/core @capacitor/cli @capacitor/ios @capacitor/android
 ng add @angular/pwa
 npx cap init litigapp co.litigapp.app --web-dir=dist/litigapp-web/browser
 ```
 
-Configurar `tailwind.config.js` con `content: ['./src/**/*.{html,ts}']` y tokens del design system.
-Configurar `eslint.config.js` con `no-restricted-imports` para boundaries de capas.
-Habilitar **zoneless change detection** (disponible estable en Angular 20) en `app.config.ts`:
+**Setup de Tailwind v4 (CSS-first — crítico, aquí es donde se rompe si se hace con sintaxis v3):**
+
+1. `.postcssrc.json` en la raíz:
+   ```json
+   { "plugins": { "@tailwindcss/postcss": {} } }
+   ```
+2. `src/styles.css` — **única forma correcta en v4** (NO usar `@tailwind base/components/utilities`, eso es v3 y con `@tailwindcss/postcss` no genera NADA):
+   ```css
+   @import "tailwindcss";
+
+   @theme {
+     /* tokens del design system §8 — así se consumen como bg-primary-600, text-muted, etc. */
+     --color-primary-700: #1d4ed8;
+     --color-primary-600: #2563eb;
+     --color-primary-500: #3b82f6;
+     --color-background: #f8fafc;
+     --color-surface:    #ffffff;
+     --color-border:     #e2e8f0;
+     --color-text:       #1e293b;
+     --color-muted:      #64748b;
+     --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+   }
+   ```
+3. **NO existe `tailwind.config.js` en v4.** El content-scanning es automático (incluye `.ts` y `.html`); la config va en `@theme`.
+4. Verificación obligatoria: tras el scaffolding, `pnpm start` y confirmar visualmente que una clase de Tailwind (ej. `bg-primary-600`) **renderiza color**. Si no pinta, Tailwind no está generando utilidades — NO avanzar hasta arreglarlo.
+
+Configurar `eslint.config.js` con `no-restricted-imports` para boundaries de capas y la regla de estructura de componentes (ver abajo). Habilitar **zoneless change detection** (estable en Angular 20) en `app.config.ts`:
 ```typescript
 import { provideZonelessChangeDetection } from '@angular/core';
 providers: [provideZonelessChangeDetection(), ...]
 ```
 
-Configurar `tailwind.config.js` con tokens del design system. Configurar `eslint.config.js` con `no-restricted-imports`.
+**Estructura de componentes (obligatoria, enforced por ESLint):** cada componente usa **archivos separados** — `xxx.component.ts` + `xxx.component.html` (`templateUrl`) + `xxx.component.css` (`styleUrl`). **Prohibido `template:` o `styles:` inline.** Regla en `eslint.config.js`:
+```js
+'@angular-eslint/component-max-inline-declarations': ['error', { template: 0, styles: 0, animations: 0 }]
+```
 
 ### Step 15: Layout base + auth + interceptor
 
@@ -2739,8 +2783,7 @@ volumes: { pg_data: }
 
 **Para producción (obligatorio)** — Railway requiere container. Dos Dockerfiles:
 
-`Dockerfile.api` — API HTTP. Escucha en el `PORT` que inyecta Railway (fallback 8080
-local), para no tener que sincronizar a mano con el "target port" del dashboard:
+`Dockerfile.api` — API HTTP que escucha en :8080:
 ```dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
@@ -2751,8 +2794,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 EXPOSE 8080
-ENV LITIGAPP_ROLE=api
-ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet LitigApp.Api.dll"]
+ENV ASPNETCORE_URLS=http://+:8080
+ENTRYPOINT ["dotnet", "LitigApp.Api.dll"]
 ```
 
 `Dockerfile.worker` — Worker Hangfire que NO expone HTTP:
@@ -2982,7 +3025,7 @@ ASP.NET Core 10 (.NET 10 LTS, C# 14) + EF Core 10 + PostgreSQL 16 + Hangfire + J
 - `Domain` — entidades, value objects, eventos. Sin dependencias externas.
 - `Application` — handlers CQRS (sin MediatR — handlers propios), validators, contratos.
 - `Infrastructure` — EF Core, Identity, clientes externos (Rama Judicial, Resend, Meta), QuestPDF, ClosedXML.
-- `Jobs` — Hangfire jobs: HotSync (diario), DeepSync (encolado), NotificationDispatcher (cada 5min), InitialFetch.
+- `Jobs` — Hangfire jobs: OverviewSweep (recurrente 15min), ActionsSweep (encolado), CompletePartialFetch (encolado), DispatchUserNotifications/DispatchImportComplete (triggered), NotificationFallbackSweep (recurrente cada hora), BulkImport.
 - `Api` — endpoints organizados por feature (Minimal APIs con MapGroup), middleware, Program.cs.
 
 Reglas: Domain ← nada. Application ← Domain. Infrastructure ← App+Dom. Jobs ← App+Infra+Dom. Api ← todos.
@@ -3017,6 +3060,9 @@ Job (Hangfire) → Handler (Application) → IRamaJudicialClient (Infrastructure
 12. **Reactive Forms para todos los formularios** (no Template-driven).
 13. **Tailwind utility-first**: cero CSS custom salvo el strictly necesario.
 14. **lucide-angular para iconos**: no SVGs propios salvo logo.
+15. **Archivos separados por componente**: `templateUrl` + `styleUrl` siempre. **Prohibido `template:`/`styles:` inline** (enforced por `@angular-eslint/component-max-inline-declarations`).
+16. **Tailwind v4 CSS-first**: `@import "tailwindcss";` + `@theme` en `styles.css`. NUNCA `@tailwind base/components/utilities` (v3) ni `tailwind.config.js`.
+17. **Ningún componente se da por terminado sin verificación visual**: levantar la app (`pnpm start`) y confirmar que renderiza con estilos y matchea el mockup. Plantillas sin estilos = PR incompleta.
 
 ## Design System
 

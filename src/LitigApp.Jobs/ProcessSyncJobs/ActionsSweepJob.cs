@@ -20,7 +20,9 @@ public sealed class ActionsSweepJob(
     IRamaJudicialClient ramaClient,
     ISyncStateService syncState,
     ISyncJobScheduler scheduler,
+    ISyncDelay syncDelay,
     IOptions<SweepOptions> sweepOptions,
+    IOptions<ThrottleOptions> throttleOptions,
     IOptions<WafOptions> wafOptions,
     IDateTimeProvider clock,
     ILogger<ActionsSweepJob> logger)
@@ -29,6 +31,7 @@ public sealed class ActionsSweepJob(
     {
         var opts = sweepOptions.Value;
         var waf = wafOptions.Value;
+        var throttleOpts = throttleOptions.Value;
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
 
         // Cooldown gate — reschedule (this is a triggered one-shot, not a recurring job).
@@ -40,6 +43,9 @@ public sealed class ActionsSweepJob(
             return;
         }
 
+        // Adaptive throttle (D1): pace in the job, not the client.
+        var throttleSeconds = await syncState.GetActionsThrottleSecondsAsync(ct);
+
         var processes = await processRepository.GetPendingActionsAsync(opts.BatchSize, ct);
         logger.LogInformation("ActionsSweepJob loaded {Count} processes pending actions.", processes.Count);
 
@@ -47,10 +53,15 @@ public sealed class ActionsSweepJob(
         int success = 0, changed = 0, errors = 0;
         var wafTriggered = false;
 
+        var first = true;
         foreach (var process in processes)
         {
             if (ct.IsCancellationRequested)
                 break;
+
+            if (!first)
+                await syncDelay.WaitAsync(PaceDelay(throttleSeconds, throttleOpts), ct);
+            first = false;
 
             process.LastSyncAttemptAt = now;
 
@@ -146,5 +157,11 @@ public sealed class ActionsSweepJob(
         process.SyncStatus = ProcessSyncStatus.Error;
         process.SyncError = message;
         process.SyncAttempts++;
+    }
+
+    private static TimeSpan PaceDelay(int throttleSeconds, ThrottleOptions opts)
+    {
+        var jitterMaxMs = Math.Max(1, (opts.ActionsIntervalSecondsMax - opts.ActionsIntervalSecondsMin) * 1000);
+        return TimeSpan.FromSeconds(throttleSeconds) + TimeSpan.FromMilliseconds(Random.Shared.Next(0, jitterMaxMs));
     }
 }

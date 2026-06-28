@@ -17,8 +17,12 @@ public sealed class RamaJudicialOptions
     /// </summary>
     public int TimeoutSeconds { get; init; } = 30;
 
-    /// <summary>Base delay between API requests (ms) to avoid WAF rate limiting.</summary>
-    public int DelayBetweenRequestsMs { get; init; } = 2500;
+    /// <summary>
+    /// Minimum safety floor between API requests (ms). The sweep jobs own the main adaptive
+    /// pacing (decision D1, throttle read from sync_state); this floor protects ad-hoc callers
+    /// (synchronous creation, bulk import) regardless of the job throttle.
+    /// </summary>
+    public int DelayBetweenRequestsMs { get; init; } = 500;
 
     /// <summary>Random jitter added to DelayBetweenRequestsMs (ms).</summary>
     public int DelayJitterMs { get; init; } = 500;
