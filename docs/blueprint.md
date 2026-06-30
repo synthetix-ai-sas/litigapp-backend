@@ -1682,7 +1682,7 @@ Extraído directamente del mockup aprobado (`litigapp_mockup.tsx`).
 
 ### 9.1 Flujo
 
-1. **Registro**: POST `/auth/register` con `{ email, password, fullName, whatsappPhone? }` → crea `AspNetUser` + envía email de confirmación (Resend).
+1. **Registro**: POST `/auth/register` con `{ email, password, fullName, whatsappPhone?, acceptedTerms, acceptedPrivacy }` → valida que `acceptedTerms` y `acceptedPrivacy` sean `true` (si no, 422) → crea `AspNetUser`, registra la aceptación en `legal_acceptances` (versión + timestamp + IP) y envía email de confirmación (Resend). Ver §9.5.
 2. **Login**: POST `/auth/login` con `{ email, password }` → valida con `SignInManager` → devuelve `{ accessToken (15 min), refreshToken (7 días) }`.
 3. **Refresh**: POST `/auth/refresh` con `{ refreshToken }` → genera nuevo par.
 4. **Reset password**: solicitar email → click en link con token → confirmar nuevo password.
@@ -1709,6 +1709,43 @@ Asignar `Admin` manualmente a los founding accounts via seed o panel interno.
 - En 401 con `code == 'TOKEN_EXPIRED'`: intentar refresh, reintentar request original, si refresh falla → logout y redirect a `/login`.
 - `AuthService` expone `currentUser = signal<User | null>(null)` y `isAuthenticated = computed(() => !!currentUser())`.
 - `authGuard` redirige a `/login` si no hay sesión.
+
+### 9.5 Cumplimiento legal (habeas data + términos de uso)
+
+Obligaciones derivadas de la legislación colombiana (Ley 1581/2012, Decreto 1074/2015, Ley 1480/2011). Los documentos legales (Política de Tratamiento de Datos a nivel empresa + Términos y Condiciones a nivel app) viven fuera del código y se enlazan; aquí van solo los requisitos que la **aplicación** debe implementar.
+
+> ⚠️ Los textos legales requieren revisión de un abogado. La app NO debe asumir contenido legal; solo enlaza los documentos vigentes y registra su aceptación.
+
+**1. Aceptación en el registro (consentimiento informado):**
+- El formulario de registro incluye un checkbox **obligatorio** (no premarcado) con texto: "He leído y acepto los [Términos y Condiciones] y la [Política de Tratamiento de Datos]" (ambos como enlaces).
+- El registro falla (422) si no se acepta. El backend valida la aceptación, no solo el frontend.
+- Se persiste la aceptación con **versión del documento + timestamp** por usuario.
+
+**2. Persistencia de la aceptación** — tabla `legal_acceptances`:
+```
+id uuid PK
+user_id text FK
+document_type text         -- 'terms' | 'privacy'
+document_version text      -- ej. 'v1.0'
+accepted_at timestamptz
+ip_address inet            -- evidencia razonable del consentimiento
+```
+Cuando cambie una versión vigente de un documento, se solicita re-aceptación al siguiente login.
+
+**3. Versionado de documentos:** los documentos legales tienen versión (`v1.0`, `v1.1`...). La versión vigente se configura en `appsettings` (`Legal:TermsVersion`, `Legal:PrivacyVersion`) y se muestra en la UI.
+
+**4. Canal de derechos del titular:** correo de habeas data (`Legal:DataProtectionEmail`, ej. `protecciondedatos@tododeia.com`) visible en la Política y en la pantalla de Settings. Las solicitudes (consultas/reclamos) se atienden en los plazos legales (consultas 10 días hábiles; reclamos 15 días hábiles). En MVP basta el canal de correo; no se requiere flujo in-app dedicado.
+
+**5. Supresión de cuenta y datos:** el usuario puede solicitar la eliminación de su cuenta y datos personales. En MVP puede ser vía el correo de habeas data; idealmente, botón "Eliminar cuenta" en Settings que dispare borrado/anonimización (respetando obligaciones legales de conservación, ej. facturación).
+
+**6. Datos de terceros (rol de Encargado):** LitigApp procesa datos de clientes y contrapartes que el abogado carga. El abogado es Responsable; LitigApp es Encargado. Los Términos incluyen la cláusula donde el usuario garantiza tener autorización para tratar esos datos. No requiere desarrollo adicional, pero condiciona el texto legal.
+
+**7. Dónde viven los documentos (hosting):**
+- **MVP — rutas estáticas dentro de la app Angular:** `app.litigapp.co/legal/terminos` y `app.litigapp.co/legal/privacidad`. El contenido vive como **HTML/Markdown estático versionado en el repo del frontend** (ej. `src/assets/legal/terminos.v1.0.md`), renderizado en una pantalla simple. NO se enlaza a Google Docs en producción.
+- **Flujo de fuente de verdad:** los Google Docs son solo la superficie de **redacción y revisión legal**. Una vez el abogado aprueba, el texto final se copia al repo como el contenido publicado. La versión del archivo (`v1.0`...) debe coincidir con `Legal:TermsVersion` / `Legal:PrivacyVersion`.
+- **Por qué en repo:** auditoría (git prueba qué versión estaba viva al momento de cada aceptación, junto con `legal_acceptances.document_version`), branding propio y sin dependencia externa.
+- **Post-MVP:** cuando exista el sitio de empresa (`tododeia.com`), mover la **Política de Privacidad** (nivel empresa) a ese dominio y que la app enlace hacia afuera; los **Términos** (nivel app) permanecen en la app.
+- **Enlaces:** ambos documentos enlazados desde el checkbox del registro, el **footer** global y la pantalla de Settings (abrir en pestaña nueva).
 
 ---
 
@@ -3063,6 +3100,7 @@ Job (Hangfire) → Handler (Application) → IRamaJudicialClient (Infrastructure
 15. **Archivos separados por componente**: `templateUrl` + `styleUrl` siempre. **Prohibido `template:`/`styles:` inline** (enforced por `@angular-eslint/component-max-inline-declarations`).
 16. **Tailwind v4 CSS-first**: `@import "tailwindcss";` + `@theme` en `styles.css`. NUNCA `@tailwind base/components/utilities` (v3) ni `tailwind.config.js`.
 17. **Ningún componente se da por terminado sin verificación visual**: levantar la app (`pnpm start`) y confirmar que renderiza con estilos y matchea el mockup. Plantillas sin estilos = PR incompleta.
+18. **Consentimiento legal obligatorio en el registro**: no se crea cuenta sin aceptar Términos y Política (validado en backend), con versión + timestamp persistidos en `legal_acceptances`. Links a ambos documentos en footer y Settings. Ver §9.5.
 
 ## Design System
 
