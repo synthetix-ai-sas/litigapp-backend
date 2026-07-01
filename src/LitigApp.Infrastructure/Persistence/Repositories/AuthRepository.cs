@@ -27,6 +27,9 @@ public sealed class AuthRepository : IAuthRepository
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
     }
 
+    public async Task AddLegalAcceptanceAsync(LegalAcceptance acceptance, CancellationToken ct = default) =>
+        await _db.LegalAcceptances.AddAsync(acceptance, ct);
+
     public Task SaveChangesAsync(CancellationToken ct = default) =>
         _db.SaveChangesAsync(ct);
 }

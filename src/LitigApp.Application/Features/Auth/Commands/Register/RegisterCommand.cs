@@ -6,4 +6,9 @@ public record RegisterCommand(
     string Email,
     string Password,
     string FullName,
-    string? WhatsAppPhone) : ICommand<AuthTokensResponse>;
+    string? WhatsAppPhone,
+    bool AcceptedTerms,
+    bool AcceptedPrivacy,
+    string? IpAddress,
+    string TermsVersion,
+    string PrivacyVersion) : ICommand<AuthTokensResponse>;
