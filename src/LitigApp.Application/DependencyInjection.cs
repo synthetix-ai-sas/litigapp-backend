@@ -57,6 +57,7 @@ public static class DependencyInjection
 
             // Process command handlers (+ shared creation service)
             services.AddScoped<ProcessCreationService>();
+            services.AddScoped<IProcessCreator>(sp => sp.GetRequiredService<ProcessCreationService>());
             services.AddScoped<ICommandHandler<CreateProcessFromFileNumberCommand, ProcessDetailDto>, CreateProcessFromFileNumberHandler>();
             services.AddScoped<ICommandHandler<CreateProcessFromWizardCommand, ProcessDetailDto>, CreateProcessFromWizardHandler>();
             services.AddScoped<ICommandHandler<MarkAttendedCommand, Unit>, MarkAttendedHandler>();

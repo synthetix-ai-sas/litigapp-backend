@@ -157,6 +157,8 @@ public static class DependencyInjection
         services.AddScoped<IProcessReader, ProcessReader>();
         services.AddScoped<IPartialFetchScheduler, NoOpPartialFetchScheduler>();
         services.AddScoped<IProcessPdfGenerator, ProcessPdfGenerator>();
+        services.AddScoped<IImportJobRepository, ImportJobRepository>();
+        services.AddScoped<IOutboxRepository, OutboxRepository>();
 
         return services;
     }

@@ -19,8 +19,14 @@ public class ImportJob
     /// <summary>Column mapping confirmed by user (jsonb).</summary>
     public string? ColumnMapping { get; set; }
 
-    /// <summary>Per-row errors array (jsonb): [{row, message}, ...]</summary>
+    /// <summary>Per-row errors array (jsonb): [{row, radicado, code, message}, ...]</summary>
     public string? Errors { get; set; }
+
+    /// <summary>Job-level failure reason (e.g. "preview_expired").</summary>
+    public string? SyncError { get; set; }
+
+    /// <summary>Links back to the cached preview (in-memory TTL 10 min; used for WAF resume).</summary>
+    public Guid PreviewId { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }

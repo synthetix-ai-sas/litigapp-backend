@@ -7,7 +7,7 @@ using LitigApp.Domain.Processes;
 namespace LitigApp.Application.Features.Processes.Services;
 
 /// <summary>
-/// Shared synchronous creation flow for both /full-number and /wizard.
+/// Shared synchronous creation flow for both /full-number, /wizard, and BulkImportJob.
 /// Calls the Rama Judicial API (overview → detail → subjects → actions), persists the
 /// process graph in a single SaveChanges, and degrades to a "partial" status if any
 /// post-overview call fails. Returns the created process detail.
@@ -18,8 +18,10 @@ public sealed class ProcessCreationService(
     IProcessReader reader,
     IDateTimeProvider clock,
     IPartialFetchScheduler partialFetchScheduler,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser) : IProcessCreator
 {
+    /// <summary>HTTP-context entry point: pulls userId from <see cref="ICurrentUserService"/>
+    /// and checks for an active import (bloqueo mutuo — blueprint §9).</summary>
     public async Task<Result<ProcessDetailDto>> CreateAsync(
         string fileNumber, string? alias, CancellationToken ct)
     {
@@ -35,6 +37,12 @@ public sealed class ProcessCreationService(
         if (await repository.ExistsAsync(userId, fileNumber, ct))
             return Result<ProcessDetailDto>.Failure(ProcessErrorCodes.DuplicateProcess);
 
+        return await CoreCreateAsync(userId, fileNumber, alias, ct);
+    }
+
+    private async Task<Result<ProcessDetailDto>> CoreCreateAsync(
+        string userId, string fileNumber, string? alias, CancellationToken ct)
+    {
         var overviewResult = await rama.GetOverviewByFileNumberAsync(fileNumber, ct);
         if (!overviewResult.IsSuccess)
             return Result<ProcessDetailDto>.Failure(ProcessErrorCodes.RamaOverviewFailed);
@@ -128,6 +136,24 @@ public sealed class ProcessCreationService(
 
         var dto = await reader.GetByIdAsync(userId, process.Id, ct);
         return Result<ProcessDetailDto>.Success(dto!);
+    }
+
+    /// <summary>
+    /// Job-context entry point (IProcessCreator): userId provided directly.
+    /// Skips the active-import check (the caller IS the import job).
+    /// Used by BulkImportJob per row.
+    /// </summary>
+    async Task<Result<ProcessDetailDto>> IProcessCreator.CreateAsync(
+        string userId, string fileNumber, string? alias, CancellationToken ct)
+    {
+        fileNumber = (fileNumber ?? string.Empty).Trim();
+        if (!FileNumberRules.IsValid(fileNumber))
+            return Result<ProcessDetailDto>.Failure(ProcessErrorCodes.InvalidFileNumber);
+
+        if (await repository.ExistsAsync(userId, fileNumber, ct))
+            return Result<ProcessDetailDto>.Failure(ProcessErrorCodes.DuplicateProcess);
+
+        return await CoreCreateAsync(userId, fileNumber, alias, ct);
     }
 
     private static DateTimeOffset? ToUtc(DateTime? value) =>
