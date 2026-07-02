@@ -58,6 +58,8 @@ public static class DependencyInjection
         services.AddScoped<OverviewSweepJob>();
         services.AddScoped<ActionsSweepJob>();
         services.AddScoped<DispatchUserNotificationsJob>();
+        services.AddScoped<BulkImportJob>();
+        services.AddScoped<DispatchImportCompleteJob>();
         services.AddScoped<CompletePartialFetchJob>();
 
         if (isWorker)

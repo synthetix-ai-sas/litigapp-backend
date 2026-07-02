@@ -21,4 +21,13 @@ internal sealed class HangfireSyncJobScheduler(IBackgroundJobClient client) : IS
 
     public void SchedulePartialFetch(Guid processId, TimeSpan delay) =>
         client.Schedule<CompletePartialFetchJob>(j => j.RunAsync(processId, CancellationToken.None), delay);
+
+    public void EnqueueBulkImport(Guid importJobId) =>
+        client.Enqueue<BulkImportJob>(j => j.RunAsync(importJobId, CancellationToken.None));
+
+    public void ScheduleBulkImport(Guid importJobId, TimeSpan delay) =>
+        client.Schedule<BulkImportJob>(j => j.RunAsync(importJobId, CancellationToken.None), delay);
+
+    public void EnqueueImportComplete(Guid importJobId) =>
+        client.Enqueue<DispatchImportCompleteJob>(j => j.RunAsync(importJobId, CancellationToken.None));
 }

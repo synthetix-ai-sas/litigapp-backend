@@ -20,4 +20,13 @@ public interface ISyncJobScheduler
 
     /// <summary>Schedules a partial-fetch completion after <paramref name="delay"/> (WAF cooldown resume).</summary>
     void SchedulePartialFetch(Guid processId, TimeSpan delay);
+
+    /// <summary>Enqueues the bulk-import job for an approved import.</summary>
+    void EnqueueBulkImport(Guid importJobId);
+
+    /// <summary>Re-enqueues the bulk-import job after a WAF cooldown pause.</summary>
+    void ScheduleBulkImport(Guid importJobId, TimeSpan delay);
+
+    /// <summary>Triggers the ImportComplete notification dispatch.</summary>
+    void EnqueueImportComplete(Guid importJobId);
 }
