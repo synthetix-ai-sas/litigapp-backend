@@ -2,7 +2,9 @@ using System.Net;
 using Hangfire;
 using Hangfire.PostgreSql;
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Features.Imports;
 using LitigApp.Infrastructure.Catalog;
+using LitigApp.Infrastructure.Imports;
 using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Notifications.Email;
@@ -25,7 +27,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool isWorker)
     {
         // ── Database ──────────────────────────────────────────────────────────
         var connectionString = configuration.GetConnectionString("Postgres")
@@ -36,37 +39,39 @@ public static class DependencyInjection
                 .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention());
 
-
-        // ── JWT Options ───────────────────────────────────────────────────────
-        services.AddOptions<JwtOptions>()
-            .BindConfiguration(JwtOptions.SectionName)
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
-        // ── Auth services ─────────────────────────────────────────────────────
-        services.AddHttpContextAccessor();
-        services.AddScoped<IJwtTokenService, JwtTokenService>();
-        services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IEmailSender, NoOpEmailSender>();
-        services.AddScoped<IIdentityService, IdentityService>();
-        services.AddScoped<IAuthRepository, AuthRepository>();
 
-        // ── ASP.NET Core Identity ─────────────────────────────────────────────
-        services.AddIdentity<ApplicationUser, IdentityRole>(options =>
-            {
-                options.Password.RequiredLength = 8;
-                options.Password.RequireDigit = true;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireUppercase = false;
-                options.Password.RequireNonAlphanumeric = false;
-                options.User.RequireUniqueEmail = true;
-                options.SignIn.RequireConfirmedEmail = false; // set to true in production
-            })
-            .AddEntityFrameworkStores<AppDbContext>()
-            .AddDefaultTokenProviders();
+        // JWT/Identity — api role only; the worker never issues/validates tokens.
+        if (!isWorker)
+        {
+            services.AddOptions<JwtOptions>()
+                .BindConfiguration(JwtOptions.SectionName)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddHttpContextAccessor();
+            services.AddScoped<IJwtTokenService, JwtTokenService>();
+            services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddScoped<IIdentityService, IdentityService>();
+            services.AddScoped<IAuthRepository, AuthRepository>();
+
+            services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+                {
+                    options.Password.RequiredLength = 8;
+                    options.Password.RequireDigit = true;
+                    options.Password.RequireLowercase = true;
+                    options.Password.RequireUppercase = false;
+                    options.Password.RequireNonAlphanumeric = false;
+                    options.User.RequireUniqueEmail = true;
+                    options.SignIn.RequireConfirmedEmail = false; // set to true in production
+                })
+                .AddEntityFrameworkStores<AppDbContext>()
+                .AddDefaultTokenProviders();
+        }
 
         // ── Time ──────────────────────────────────────────────────────────────
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
+        services.AddSingleton<ISyncDelay, RealSyncDelay>();
 
         // ── Rama Judicial HTTP client ─────────────────────────────────────────
         services.Configure<RamaJudicialOptions>(
@@ -135,6 +140,14 @@ public static class DependencyInjection
                     JobExpirationCheckInterval = TimeSpan.FromHours(1),
                     InvisibilityTimeout = TimeSpan.FromMinutes(30),
                 }));
+
+        // ── Excel import (preview pipeline) ───────────────────────────────────
+        services.AddOptions<ImportOptions>()
+            .BindConfiguration(ImportOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddScoped<IExcelParser, ClosedXmlExcelParser>();
+        services.AddSingleton<IImportPreviewCache, ImportPreviewCache>();
 
         // ── Sync engine state (sync_state KV: WAF cooldown + adaptive throttle) ─
         services.AddScoped<ISyncStateService, SyncStateService>();

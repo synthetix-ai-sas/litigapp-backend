@@ -5,6 +5,7 @@ using LitigApp.Application.Common.Abstractions;
 using LitigApp.Domain.Processes;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Infrastructure.Persistence.Repositories;
+using LitigApp.Infrastructure.Sync;
 using LitigApp.Infrastructure.Time;
 using LitigApp.Jobs;
 using LitigApp.Jobs.ProcessSyncJobs;
@@ -211,11 +212,18 @@ public sealed class OverviewSweepJobTests : IAsyncLifetime
             MinimumHoursBetweenSyncsPerProcess = 22,
         });
 
+        var clock = new SystemDateTimeProvider();
+
         return new OverviewSweepJob(
             repo,
             client,
+            new SyncStateService(_db, clock),
+            new RecordingSyncJobScheduler(),
+            new NoOpSyncDelay(),
             opts,
-            new SystemDateTimeProvider(),
+            Options.Create(new ThrottleOptions()),
+            Options.Create(new WafOptions()),
+            clock,
             NullLogger<OverviewSweepJob>.Instance);
     }
 

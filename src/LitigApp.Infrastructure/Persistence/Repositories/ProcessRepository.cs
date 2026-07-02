@@ -17,12 +17,30 @@ internal sealed class ProcessRepository(AppDbContext db) : IProcessRepository
 
         return db.Processes
             .Where(p => p.IsActive &&
-                (p.SyncPhase == "pending_overview" ||
-                 (p.SyncPhase == "idle" && (p.LastSyncedAt == null || p.LastSyncedAt < cutoff))))
+                (p.SyncPhase == ProcessSyncPhase.PendingOverview ||
+                 (p.SyncPhase == ProcessSyncPhase.Idle && (p.LastSyncedAt == null || p.LastSyncedAt < cutoff))))
             .OrderBy(p => p.LastSyncAttemptAt == null ? DateTimeOffset.MinValue : p.LastSyncAttemptAt.Value)
             .Take(batchSize)
             .ToListAsync(ct);  // tracked — we modify these entities immediately after
     }
+
+    public Task<List<Process>> GetPendingActionsAsync(int batchSize, CancellationToken ct) =>
+        db.Processes
+            .Where(p => p.IsActive && p.SyncPhase == ProcessSyncPhase.PendingActions)
+            .OrderBy(p => p.LastSyncAttemptAt == null ? DateTimeOffset.MinValue : p.LastSyncAttemptAt.Value)
+            .Take(batchSize)
+            .ToListAsync(ct);  // tracked — modified in the sweep loop
+
+    public Task<List<ProcessAction>> GetActionsAsync(Guid processId, CancellationToken ct) =>
+        db.ProcessActions.AsNoTracking()
+            .Where(a => a.ProcessId == processId)
+            .ToListAsync(ct);
+
+    public async Task AddActionsAsync(IEnumerable<ProcessAction> actions, CancellationToken ct) =>
+        await db.ProcessActions.AddRangeAsync(actions, ct);
+
+    public async Task AddSubjectsAsync(IEnumerable<ProcessSubject> subjects, CancellationToken ct) =>
+        await db.ProcessSubjects.AddRangeAsync(subjects, ct);
 
     public Task<bool> ExistsAsync(string userId, string fileNumber, CancellationToken ct) =>
         db.Processes.AsNoTracking().AnyAsync(p => p.UserId == userId && p.FileNumber == fileNumber, ct);
@@ -44,6 +62,12 @@ internal sealed class ProcessRepository(AppDbContext db) : IProcessRepository
 
     public Task<Process?> GetOwnedAsync(Guid id, string userId, CancellationToken ct) =>
         db.Processes.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId, ct);
+
+    public Task<Process?> GetByIdAsync(Guid id, CancellationToken ct) =>
+        db.Processes.FirstOrDefaultAsync(p => p.Id == id, ct);  // tracked — mutated by the job
+
+    public Task<bool> HasSubjectsAsync(Guid processId, CancellationToken ct) =>
+        db.ProcessSubjects.AsNoTracking().AnyAsync(s => s.ProcessId == processId, ct);
 
     public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }

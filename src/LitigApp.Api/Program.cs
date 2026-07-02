@@ -4,6 +4,7 @@ using LitigApp.Api.Auth;
 using LitigApp.Api.Cors;
 using LitigApp.Api.Features.Auth;
 using LitigApp.Api.Features.Catalog;
+using LitigApp.Api.Features.Imports;
 using LitigApp.Api.Features.Processes;
 using LitigApp.Api.Hangfire;
 using LitigApp.Api.OpenApi;
@@ -13,6 +14,7 @@ using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Jobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
@@ -43,8 +45,8 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext());
 
-    builder.Services.AddInfrastructure(builder.Configuration);
-    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration, isWorker);
+    builder.Services.AddApplication(isWorker);
     builder.Services.AddJobs(builder.Configuration, isWorker);
 
     if (!isWorker)
@@ -53,6 +55,9 @@ try
             .BindConfiguration(CorsOptions.SectionName)
             .ValidateDataAnnotations()
             .ValidateOnStart();
+
+        builder.Services.AddOptions<HangfireOptions>()
+            .BindConfiguration(HangfireOptions.SectionName);
 
         builder.Services.AddCors(options =>
             options.AddDefaultPolicy(policy =>
@@ -126,6 +131,17 @@ try
 
     if (!isWorker)
     {
+        // Railway terminates TLS and forwards plain HTTP, so without this every URL the
+        // app builds (e.g. the OpenAPI server entry) is http, triggering mixed-content
+        // blocks. Known*.Clear() is safe: the only inbound path is Railway's own proxy.
+        var forwardedHeadersOptions = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+        };
+        forwardedHeadersOptions.KnownIPNetworks.Clear();
+        forwardedHeadersOptions.KnownProxies.Clear();
+        app.UseForwardedHeaders(forwardedHeadersOptions);
+
         app.UseCors();
         app.UseAuthentication();
         app.UseAuthorization();
@@ -162,6 +178,7 @@ try
         app.MapAuthEndpoints();
         app.MapCatalogEndpoints();
         app.MapProcessesEndpoints();
+        app.MapImportsEndpoints();
     }
     else
     {

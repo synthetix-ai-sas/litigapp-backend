@@ -1,5 +1,6 @@
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Application.Features.Processes.Dtos;
+using LitigApp.Application.Features.Processes.Sync;
 using LitigApp.Domain.Common;
 using LitigApp.Domain.Processes;
 
@@ -82,20 +83,7 @@ public sealed class ProcessCreationService(
         if (subjectsResult.IsSuccess && subjectsResult.Value is { } subjects)
         {
             foreach (var s in subjects)
-            {
-                process.Subjects.Add(new ProcessSubject
-                {
-                    Id = Guid.NewGuid(),
-                    ProcessId = process.Id,
-                    ExternalSubjectId = s.ExternalSubjectId,
-                    SubjectType = s.SubjectType,
-                    IsSummoned = s.IsServedByPublication,
-                    Identification = s.Identification,
-                    Name = s.FullName,
-                    Source = "api",
-                    CreatedAt = now,
-                });
-            }
+                process.Subjects.Add(ProcessSubjectFactory.Create(s, process.Id, now));
         }
         else
         {
@@ -106,24 +94,7 @@ public sealed class ProcessCreationService(
         if (actionsResult.IsSuccess && actionsResult.Value is { } actions)
         {
             foreach (var a in actions)
-            {
-                process.Actions.Add(new ProcessAction
-                {
-                    Id = Guid.NewGuid(),
-                    ProcessId = process.Id,
-                    ExternalActionId = a.ExternalActionId,
-                    ConsecutiveNumber = a.ActionNumber,
-                    ActionDate = ToDateOnly(a.ActionDate),
-                    Action = a.ActionType,
-                    Annotation = a.Note,
-                    TermStartDate = ToDateOnly(a.StartDate),
-                    TermEndDate = ToDateOnly(a.EndDate),
-                    RecordedAt = ToDateOnly(a.RegistrationDate),
-                    HasDocuments = a.HasDocuments,
-                    RuleCode = a.RuleCode,
-                    CreatedAt = now,
-                });
-            }
+                process.Actions.Add(ProcessActionFactory.Create(a, process.Id, now));
 
             if (actions.Count > 0)
             {
@@ -139,13 +110,13 @@ public sealed class ProcessCreationService(
         if (missing.Count > 0)
         {
             process.SyncStatus = ProcessSyncStatus.Partial;
-            process.SyncPhase = "pending_partial_completion";
+            process.SyncPhase = ProcessSyncPhase.PendingPartialCompletion;
             process.SyncError = $"No se pudo completar: {string.Join(", ", missing)}.";
         }
         else
         {
             process.SyncStatus = ProcessSyncStatus.Ok;
-            process.SyncPhase = "idle";
+            process.SyncPhase = ProcessSyncPhase.Idle;
             process.LastSyncedAt = now;
         }
 
@@ -161,7 +132,4 @@ public sealed class ProcessCreationService(
 
     private static DateTimeOffset? ToUtc(DateTime? value) =>
         value is null ? null : new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc));
-
-    private static DateOnly? ToDateOnly(DateTime? value) =>
-        value is null ? null : DateOnly.FromDateTime(value.Value);
 }

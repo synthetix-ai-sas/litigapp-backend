@@ -29,6 +29,12 @@ internal sealed class SyncStateService(AppDbContext db, IDateTimeProvider clock)
     public async Task SetWafBlockedUntilAsync(DateTimeOffset until, string reason, CancellationToken ct)
     {
         var row = await Upsert(WafBlockedUntilKey, ct);
+
+        // Never shorten an active cooldown — concurrent 403 writers (overview + actions)
+        // must not let an earlier deadline overwrite a later one.
+        if (row.ValueTimestamp is { } current && current >= until)
+            return;
+
         row.ValueTimestamp = until;
         row.Reason = reason;
         row.UpdatedAt = clock.UtcNow;

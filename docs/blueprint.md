@@ -274,14 +274,15 @@ litigapp-backend/
 │   │
 │   ├── LitigApp.Jobs/                          # csproj — referencia: Application, Infrastructure
 │   │   ├── ProcessSyncJobs/
-│   │   │   ├── OverviewSweepJob.cs             # recurrente cada 15min — overview de todos los procesos activos
-│   │   │   ├── ActionsSweepJob.cs              # encolado por OverviewSweep si hay pending_actions
-│   │   │   ├── CompletePartialFetchJob.cs      # encolado si creación individual quedó parcial por WAF
-│   │   │   └── BulkImportJob.cs                # encolado por POST /imports — hasta 5000 filas
+│   │   │   ├── OverviewSweepJob.cs             # RecurringJob cada Sweep.OverviewIntervalMinutes (default 15min) — solo overview
+│   │   │   ├── ActionsSweepJob.cs              # encolado por OverviewSweep — actuaciones pág.1 de los procesos con cambios
+│   │   │   └── CompletePartialFetchJob.cs      # encolado tras creación/import parcial — completa endpoints faltantes
 │   │   ├── NotificationJobs/
-│   │   │   ├── DispatchUserNotificationsJob.cs # triggered al final de ActionsSweep por cada usuario con cambios
-│   │   │   ├── DispatchImportCompleteJob.cs    # triggered al final de BulkImport — email de resumen
-│   │   │   └── NotificationFallbackSweepJob.cs # recurrente cada hora — reintenta outbox huérfanos
+│   │   │   ├── DispatchUserNotificationsJob.cs # triggered por sync — 1 email digest por usuario
+│   │   │   ├── DispatchImportCompleteJob.cs    # triggered al terminar un import
+│   │   │   └── NotificationFallbackSweepJob.cs # RecurringJob cada hora — recoge outbox pendiente (NO cada 5 min)
+│   │   ├── ImportJobs/
+│   │   │   └── BulkImportJob.cs                # encolado por POST /imports — procesa Excel
 │   │   ├── MaintenanceJobs/
 │   │   │   ├── OutboxCleanupJob.cs             # semanal — borra outbox 'sent' > 30 días
 │   │   │   └── ImportJobsCleanupJob.cs         # semanal — borra import_jobs > 90 días
@@ -357,7 +358,7 @@ litigapp-web/
 └── src/
     ├── main.ts
     ├── index.html
-    ├── styles.css                              # @tailwind base/components/utilities
+    ├── styles.css                              # Tailwind v4: @import "tailwindcss"; + @theme con tokens (NO @tailwind base/components/utilities — eso es v3)
     ├── environments/
     │   ├── environment.ts                      # apiUrl placeholder
     │   └── environment.prod.ts
@@ -726,7 +727,7 @@ CREATE TABLE import_jobs (
   success_count integer NOT NULL DEFAULT 0,
   error_count integer NOT NULL DEFAULT 0,
   status text NOT NULL DEFAULT 'pending',          -- pending|running|completed|failed
-  column_mapping jsonb,                            -- { fileNumberCol: 'A', cityCol: 'B', ... }
+  column_mapping jsonb,                            -- v1: { radicadoCol: 'B', notesCol: 'I' } (radicado obligatorio, notas opcional)
   errors jsonb,                                    -- [{ row: 5, message: '...' }, ...]
   created_at timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz
@@ -1637,7 +1638,7 @@ Extraído directamente del mockup aprobado (`litigapp_mockup.tsx`).
 
 ### Tipografía
 
-- **Familia**: Inter (Tailwind default font-sans con configuración explícita en `tailwind.config.js`).
+- **Familia**: Inter, declarada en el bloque `@theme` de `styles.css` con `--font-sans: "Inter", ...` (Tailwind v4 es CSS-first; **no** hay `tailwind.config.js`).
 - **Escalas**: `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`, `text-2xl`.
 - **Pesos**: 400 (body), 500 (medium / labels), 600 (semibold / headings), 700 (bold / títulos grandes).
 
@@ -1681,7 +1682,7 @@ Extraído directamente del mockup aprobado (`litigapp_mockup.tsx`).
 
 ### 9.1 Flujo
 
-1. **Registro**: POST `/auth/register` con `{ email, password, fullName, whatsappPhone? }` → crea `AspNetUser` + envía email de confirmación (Resend).
+1. **Registro**: POST `/auth/register` con `{ email, password, fullName, whatsappPhone?, acceptedTerms, acceptedPrivacy }` → valida que `acceptedTerms` y `acceptedPrivacy` sean `true` (si no, 422) → crea `AspNetUser`, registra la aceptación en `legal_acceptances` (versión + timestamp + IP) y envía email de confirmación (Resend). Ver §9.5.
 2. **Login**: POST `/auth/login` con `{ email, password }` → valida con `SignInManager` → devuelve `{ accessToken (15 min), refreshToken (7 días) }`.
 3. **Refresh**: POST `/auth/refresh` con `{ refreshToken }` → genera nuevo par.
 4. **Reset password**: solicitar email → click en link con token → confirmar nuevo password.
@@ -1708,6 +1709,43 @@ Asignar `Admin` manualmente a los founding accounts via seed o panel interno.
 - En 401 con `code == 'TOKEN_EXPIRED'`: intentar refresh, reintentar request original, si refresh falla → logout y redirect a `/login`.
 - `AuthService` expone `currentUser = signal<User | null>(null)` y `isAuthenticated = computed(() => !!currentUser())`.
 - `authGuard` redirige a `/login` si no hay sesión.
+
+### 9.5 Cumplimiento legal (habeas data + términos de uso)
+
+Obligaciones derivadas de la legislación colombiana (Ley 1581/2012, Decreto 1074/2015, Ley 1480/2011). Los documentos legales (Política de Tratamiento de Datos a nivel empresa + Términos y Condiciones a nivel app) viven fuera del código y se enlazan; aquí van solo los requisitos que la **aplicación** debe implementar.
+
+> ⚠️ Los textos legales requieren revisión de un abogado. La app NO debe asumir contenido legal; solo enlaza los documentos vigentes y registra su aceptación.
+
+**1. Aceptación en el registro (consentimiento informado):**
+- El formulario de registro incluye un checkbox **obligatorio** (no premarcado) con texto: "He leído y acepto los [Términos y Condiciones] y la [Política de Tratamiento de Datos]" (ambos como enlaces).
+- El registro falla (422) si no se acepta. El backend valida la aceptación, no solo el frontend.
+- Se persiste la aceptación con **versión del documento + timestamp** por usuario.
+
+**2. Persistencia de la aceptación** — tabla `legal_acceptances`:
+```
+id uuid PK
+user_id text FK
+document_type text         -- 'terms' | 'privacy'
+document_version text      -- ej. 'v1.0'
+accepted_at timestamptz
+ip_address inet            -- evidencia razonable del consentimiento
+```
+Cuando cambie una versión vigente de un documento, se solicita re-aceptación al siguiente login.
+
+**3. Versionado de documentos:** los documentos legales tienen versión (`v1.0`, `v1.1`...). La versión vigente se configura en `appsettings` (`Legal:TermsVersion`, `Legal:PrivacyVersion`) y se muestra en la UI.
+
+**4. Canal de derechos del titular:** correo de habeas data (`Legal:DataProtectionEmail`, ej. `protecciondedatos@tododeia.com`) visible en la Política y en la pantalla de Settings. Las solicitudes (consultas/reclamos) se atienden en los plazos legales (consultas 10 días hábiles; reclamos 15 días hábiles). En MVP basta el canal de correo; no se requiere flujo in-app dedicado.
+
+**5. Supresión de cuenta y datos:** el usuario puede solicitar la eliminación de su cuenta y datos personales. En MVP puede ser vía el correo de habeas data; idealmente, botón "Eliminar cuenta" en Settings que dispare borrado/anonimización (respetando obligaciones legales de conservación, ej. facturación).
+
+**6. Datos de terceros (rol de Encargado):** LitigApp procesa datos de clientes y contrapartes que el abogado carga. El abogado es Responsable; LitigApp es Encargado. Los Términos incluyen la cláusula donde el usuario garantiza tener autorización para tratar esos datos. No requiere desarrollo adicional, pero condiciona el texto legal.
+
+**7. Dónde viven los documentos (hosting):**
+- **MVP — rutas estáticas dentro de la app Angular:** `app.litigapp.co/legal/terminos` y `app.litigapp.co/legal/privacidad`. El contenido vive como **HTML/Markdown estático versionado en el repo del frontend** (ej. `src/assets/legal/terminos.v1.0.md`), renderizado en una pantalla simple. NO se enlaza a Google Docs en producción.
+- **Flujo de fuente de verdad:** los Google Docs son solo la superficie de **redacción y revisión legal**. Una vez el abogado aprueba, el texto final se copia al repo como el contenido publicado. La versión del archivo (`v1.0`...) debe coincidir con `Legal:TermsVersion` / `Legal:PrivacyVersion`.
+- **Por qué en repo:** auditoría (git prueba qué versión estaba viva al momento de cada aceptación, junto con `legal_acceptances.document_version`), branding propio y sin dependencia externa.
+- **Post-MVP:** cuando exista el sitio de empresa (`tododeia.com`), mover la **Política de Privacidad** (nivel empresa) a ese dominio y que la app enlace hacia afuera; los **Términos** (nivel app) permanecen en la app.
+- **Enlaces:** ambos documentos enlazados desde el checkbox del registro, el **footer** global y la pantalla de Settings (abrir en pestaña nueva).
 
 ---
 
@@ -2382,10 +2420,26 @@ Crear `Directory.Build.props` con:
 6. `GET /imports/{id}` — opcional, solo para consulta directa de un job específico (link desde email, historial). No se usa en el flujo principal.
 7. `BulkImportJob`:
    - `UPDATE import_jobs SET status='running'` al inicio.
-   - Por cada fila: validar/construir radicado → si OK, llamar a los 4 endpoints síncronamente (rate-limit 2/seg por usuario) → persistir.
-   - `attended=true` (es importación, no novedad).
+   - Por cada fila, aplica la **estrategia de importación v1** (ver abajo).
+   - Las filas importadas quedan `attended=true` (es importación, no novedad).
    - **Actualiza `processed_rows`, `success_count`, `error_count` cada 5 filas** para que el polling tenga datos frescos.
    - Al terminar: `status='completed'`, `completed_at=now`, inserta outbox con `event_type='ImportComplete', channel='email'`.
+
+**Estrategia de importación v1 — "radicado-first", best-effort** (validada contra un Excel real de un abogado en ejercicio):
+
+- **Mapeo de columnas dirigido por el usuario.** Cada abogado nombra y ordena sus columnas distinto (incluso puede no ser Excel), así que el sistema NO hardcodea posiciones. El usuario mapea:
+  - **Obligatorio:** la columna del **radicado**.
+  - **Opcional:** la columna de **notas/observaciones** (se guarda como nota del proceso).
+- **Por cada fila:**
+  1. Lee la columna de radicado y **normaliza**: quita espacios, guiones, tabs y todo no-dígito.
+  2. ¿Quedan **exactamente 23 dígitos**?
+     - **Sí** → importar vía flujo full-number (4 endpoints; la API + los primeros 5 dígitos DANE llenan depto/municipio/despacho). Se ignora cualquier otra columna de ubicación.
+     - **No** (vacío, SIC tipo `25-463759-0`, penal/Fiscalía de 21 díg., basura) → **NO se intenta reconstruir**. La fila va a la **lista de errores** con `error.code='INVALID_RADICADO'` para carga manual con el wizard.
+  3. **Filas vacías y filas de sección/encabezado** (sin radicado en la columna mapeada) → **se saltan en silencio**; NO cuentan como error.
+- **`column_mapping` es extensible por diseño:** el shape v1 es `{ radicadoCol, notesCol }`, pero la estructura admite a futuro `{ yearCol, sequenceCol, deptCol, cityCol, courtCol, ... }` sin romper nada. El frontend solo expone radicado (obligatorio) + notas (opcional) en v1.
+- **Importación "por partes" → v2 (no v1):** la idea de mapear año/consecutivo/depto/municipio/juzgado y reconstruir el radicado es válida, pero el cuello de botella NO es año/consecutivo (esos son fáciles) sino resolver el **`official_code` (12 díg.) del despacho**: el Excel del abogado trae un *nombre* de juzgado, no su código, y depto+municipio no identifican un juzgado único. Eso obliga a **matching difuso del nombre del juzgado** contra el catálogo `courts`, cuyo riesgo es importar el **proceso equivocado en silencio** (radicado válido del despacho incorrecto) — inaceptable en una herramienta legal. Por eso se difiere a v2 y, cuando se haga, será con **match exacto normalizado + paso de confirmación humana** antes de importar, nunca fuzzy a ciegas. En v1, toda fila sin radicado de 23 díg. válido → carga manual con el wizard.
+- **Formato/encoding:** soportar **`.xlsx` vía ClosedXML** (interno UTF-8, sin romper acentos). `.csv` (Windows-1252, rompe `Villamar�a`) fuera de MVP.
+- **Fuera de la Rama Judicial:** procesos de la SIC y penales (Fiscalía) no están en la API; caen naturalmente a manual por no tener radicado de 23 díg. La app no los monitorea automáticamente en v1.
 
 **Flujo en el frontend** (importante):
 
@@ -2498,21 +2552,48 @@ Esto deja la arquitectura preparada sin costo de tiempo ni dinero en MVP.
 ```bash
 pnpm dlx @angular/cli@20 new litigapp-web --routing --style=css --ssr=false --strict --standalone
 cd litigapp-web
-pnpm add -D tailwindcss @tailwindcss/postcss postcss autoprefixer
+pnpm add -D tailwindcss @tailwindcss/postcss   # Tailwind v4 — NO autoprefixer (v4 lo incluye)
 pnpm add lucide-angular @capacitor/core @capacitor/cli @capacitor/ios @capacitor/android
 ng add @angular/pwa
 npx cap init litigapp co.litigapp.app --web-dir=dist/litigapp-web/browser
 ```
 
-Configurar `tailwind.config.js` con `content: ['./src/**/*.{html,ts}']` y tokens del design system.
-Configurar `eslint.config.js` con `no-restricted-imports` para boundaries de capas.
-Habilitar **zoneless change detection** (disponible estable en Angular 20) en `app.config.ts`:
+**Setup de Tailwind v4 (CSS-first — crítico, aquí es donde se rompe si se hace con sintaxis v3):**
+
+1. `.postcssrc.json` en la raíz:
+   ```json
+   { "plugins": { "@tailwindcss/postcss": {} } }
+   ```
+2. `src/styles.css` — **única forma correcta en v4** (NO usar `@tailwind base/components/utilities`, eso es v3 y con `@tailwindcss/postcss` no genera NADA):
+   ```css
+   @import "tailwindcss";
+
+   @theme {
+     /* tokens del design system §8 — así se consumen como bg-primary-600, text-muted, etc. */
+     --color-primary-700: #1d4ed8;
+     --color-primary-600: #2563eb;
+     --color-primary-500: #3b82f6;
+     --color-background: #f8fafc;
+     --color-surface:    #ffffff;
+     --color-border:     #e2e8f0;
+     --color-text:       #1e293b;
+     --color-muted:      #64748b;
+     --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+   }
+   ```
+3. **NO existe `tailwind.config.js` en v4.** El content-scanning es automático (incluye `.ts` y `.html`); la config va en `@theme`.
+4. Verificación obligatoria: tras el scaffolding, `pnpm start` y confirmar visualmente que una clase de Tailwind (ej. `bg-primary-600`) **renderiza color**. Si no pinta, Tailwind no está generando utilidades — NO avanzar hasta arreglarlo.
+
+Configurar `eslint.config.js` con `no-restricted-imports` para boundaries de capas y la regla de estructura de componentes (ver abajo). Habilitar **zoneless change detection** (estable en Angular 20) en `app.config.ts`:
 ```typescript
 import { provideZonelessChangeDetection } from '@angular/core';
 providers: [provideZonelessChangeDetection(), ...]
 ```
 
-Configurar `tailwind.config.js` con tokens del design system. Configurar `eslint.config.js` con `no-restricted-imports`.
+**Estructura de componentes (obligatoria, enforced por ESLint):** cada componente usa **archivos separados** — `xxx.component.ts` + `xxx.component.html` (`templateUrl`) + `xxx.component.css` (`styleUrl`). **Prohibido `template:` o `styles:` inline.** Regla en `eslint.config.js`:
+```js
+'@angular-eslint/component-max-inline-declarations': ['error', { template: 0, styles: 0, animations: 0 }]
+```
 
 ### Step 15: Layout base + auth + interceptor
 
@@ -2981,7 +3062,7 @@ ASP.NET Core 10 (.NET 10 LTS, C# 14) + EF Core 10 + PostgreSQL 16 + Hangfire + J
 - `Domain` — entidades, value objects, eventos. Sin dependencias externas.
 - `Application` — handlers CQRS (sin MediatR — handlers propios), validators, contratos.
 - `Infrastructure` — EF Core, Identity, clientes externos (Rama Judicial, Resend, Meta), QuestPDF, ClosedXML.
-- `Jobs` — Hangfire jobs: HotSync (diario), DeepSync (encolado), NotificationDispatcher (cada 5min), InitialFetch.
+- `Jobs` — Hangfire jobs: OverviewSweep (recurrente 15min), ActionsSweep (encolado), CompletePartialFetch (encolado), DispatchUserNotifications/DispatchImportComplete (triggered), NotificationFallbackSweep (recurrente cada hora), BulkImport.
 - `Api` — endpoints organizados por feature (Minimal APIs con MapGroup), middleware, Program.cs.
 
 Reglas: Domain ← nada. Application ← Domain. Infrastructure ← App+Dom. Jobs ← App+Infra+Dom. Api ← todos.
@@ -3016,6 +3097,10 @@ Job (Hangfire) → Handler (Application) → IRamaJudicialClient (Infrastructure
 12. **Reactive Forms para todos los formularios** (no Template-driven).
 13. **Tailwind utility-first**: cero CSS custom salvo el strictly necesario.
 14. **lucide-angular para iconos**: no SVGs propios salvo logo.
+15. **Archivos separados por componente**: `templateUrl` + `styleUrl` siempre. **Prohibido `template:`/`styles:` inline** (enforced por `@angular-eslint/component-max-inline-declarations`).
+16. **Tailwind v4 CSS-first**: `@import "tailwindcss";` + `@theme` en `styles.css`. NUNCA `@tailwind base/components/utilities` (v3) ni `tailwind.config.js`.
+17. **Ningún componente se da por terminado sin verificación visual**: levantar la app (`pnpm start`) y confirmar que renderiza con estilos y matchea el mockup. Plantillas sin estilos = PR incompleta.
+18. **Consentimiento legal obligatorio en el registro**: no se crea cuenta sin aceptar Términos y Política (validado en backend), con versión + timestamp persistidos en `legal_acceptances`. Links a ambos documentos en footer y Settings. Ver §9.5.
 
 ## Design System
 
