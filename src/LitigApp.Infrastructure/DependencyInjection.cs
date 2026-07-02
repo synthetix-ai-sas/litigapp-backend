@@ -2,7 +2,9 @@ using System.Net;
 using Hangfire;
 using Hangfire.PostgreSql;
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Features.Imports;
 using LitigApp.Infrastructure.Catalog;
+using LitigApp.Infrastructure.Imports;
 using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Notifications.Email;
@@ -138,6 +140,14 @@ public static class DependencyInjection
                     JobExpirationCheckInterval = TimeSpan.FromHours(1),
                     InvisibilityTimeout = TimeSpan.FromMinutes(30),
                 }));
+
+        // ── Excel import (preview pipeline) ───────────────────────────────────
+        services.AddOptions<ImportOptions>()
+            .BindConfiguration(ImportOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddScoped<IExcelParser, ClosedXmlExcelParser>();
+        services.AddSingleton<IImportPreviewCache, ImportPreviewCache>();
 
         // ── Sync engine state (sync_state KV: WAF cooldown + adaptive throttle) ─
         services.AddScoped<ISyncStateService, SyncStateService>();
