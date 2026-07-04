@@ -4,6 +4,7 @@ using LitigApp.Api.Auth;
 using LitigApp.Api.Cors;
 using LitigApp.Api.Features.Auth;
 using LitigApp.Api.Features.Catalog;
+using LitigApp.Api.Features.Imports;
 using LitigApp.Api.Features.Processes;
 using LitigApp.Api.Hangfire;
 using LitigApp.Api.OpenApi;
@@ -177,6 +178,7 @@ try
         app.MapAuthEndpoints();
         app.MapCatalogEndpoints();
         app.MapProcessesEndpoints();
+        app.MapImportsEndpoints();
     }
     else
     {
