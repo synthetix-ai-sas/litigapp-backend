@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace LitigApp.Domain.Auth;
 
 public sealed class LegalAcceptance
@@ -8,5 +10,5 @@ public sealed class LegalAcceptance
     public string DocumentType { get; set; } = null!;
     public string DocumentVersion { get; set; } = null!;
     public DateTimeOffset AcceptedAt { get; set; }
-    public string? IpAddress { get; set; }
+    public IPAddress? IpAddress { get; set; }
 }

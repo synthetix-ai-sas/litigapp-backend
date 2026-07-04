@@ -49,8 +49,8 @@ public static class DependencyInjection
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddOptions<LitigApp.Infrastructure.Options.LegalOptions>()
-                .BindConfiguration(LitigApp.Infrastructure.Options.LegalOptions.SectionName)
+            services.AddOptions<LitigApp.Infrastructure.Identity.LegalOptions>()
+                .BindConfiguration(LitigApp.Infrastructure.Identity.LegalOptions.SectionName)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 

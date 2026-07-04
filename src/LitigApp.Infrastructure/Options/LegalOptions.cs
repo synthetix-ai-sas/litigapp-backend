@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace LitigApp.Infrastructure.Options;
+namespace LitigApp.Infrastructure.Identity;
 
 public sealed class LegalOptions
 {

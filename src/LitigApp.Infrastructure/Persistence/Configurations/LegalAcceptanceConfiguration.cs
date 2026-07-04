@@ -13,7 +13,12 @@ public sealed class LegalAcceptanceConfiguration : IEntityTypeConfiguration<Lega
         builder.Property(x => x.DocumentType).IsRequired().HasMaxLength(20);
         builder.Property(x => x.DocumentVersion).IsRequired().HasMaxLength(20);
         builder.Property(x => x.AcceptedAt).IsRequired();
-        builder.Property(x => x.IpAddress).HasColumnType("character varying(45)");
+        builder.Property(x => x.IpAddress).HasColumnType("inet");
         builder.HasIndex(x => x.UserId);
+
+        builder.HasOne<LitigApp.Infrastructure.Identity.ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

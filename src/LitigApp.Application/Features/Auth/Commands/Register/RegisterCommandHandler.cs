@@ -1,3 +1,4 @@
+using System.Net;
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Domain.Auth;
 using LitigApp.Domain.Common;
@@ -57,6 +58,8 @@ public sealed class RegisterCommandHandler : ICommandHandler<RegisterCommand, Au
 
         await _authRepository.AddRefreshTokenAsync(refreshToken, ct);
 
+        IPAddress.TryParse(command.IpAddress, out var clientIp);
+
         await _authRepository.AddLegalAcceptanceAsync(new LegalAcceptance
         {
             Id = Guid.NewGuid(),
@@ -64,7 +67,7 @@ public sealed class RegisterCommandHandler : ICommandHandler<RegisterCommand, Au
             DocumentType = "terms",
             DocumentVersion = command.TermsVersion,
             AcceptedAt = acceptedAt,
-            IpAddress = command.IpAddress
+            IpAddress = clientIp
         }, ct);
 
         await _authRepository.AddLegalAcceptanceAsync(new LegalAcceptance
@@ -74,7 +77,7 @@ public sealed class RegisterCommandHandler : ICommandHandler<RegisterCommand, Au
             DocumentType = "privacy",
             DocumentVersion = command.PrivacyVersion,
             AcceptedAt = acceptedAt,
-            IpAddress = command.IpAddress
+            IpAddress = clientIp
         }, ct);
 
         await _authRepository.SaveChangesAsync(ct);
