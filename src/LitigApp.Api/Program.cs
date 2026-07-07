@@ -40,6 +40,13 @@ try
     var isWorker = string.Equals(
         builder.Configuration["LITIGAPP_ROLE"], "worker", StringComparison.OrdinalIgnoreCase);
 
+    // Local dev only: api + worker run from the same machine via `dotnet run`, so both
+    // would bind the launchSettings Kestrel port (5119) → "address already in use".
+    // Bind an ephemeral port for the worker locally. In production they are separate
+    // containers (Dockerfile.api / Dockerfile.worker), so there is no conflict — skipped.
+    if (isWorker && builder.Environment.IsDevelopment())
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+
     builder.Host.UseSerilog((ctx, services, cfg) => cfg
         .ReadFrom.Configuration(ctx.Configuration)
         .ReadFrom.Services(services)
