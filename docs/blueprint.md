@@ -1023,24 +1023,21 @@ Authorization: Bearer <jwt>
 - Persistimos lo obtenido hasta ese punto.
 - Marcamos `sync_status = 'partial'` con `sync_error` describiendo qué faltó.
 - Encolamos `CompletePartialFetchJob(processId)` para reintentar en background.
-- Devolvemos **201 Created** con `data.syncStatus = 'partial'` para que el frontend muestre: "Proceso creado. Algunos datos se están terminando de cargar, recarga en unos minutos."
+- Devolvemos **201 Created** con `syncStatus = 'partial'` para que el frontend muestre: "Proceso creado. Algunos datos se están terminando de cargar, recarga en unos minutos."
 
-**Respuesta exitosa (201)**:
+**Respuesta exitosa (201)** — sin envelope, el DTO directo:
 ```json
 {
-  "data": {
-    "id": "uuid",
-    "fileNumber": "17001400301020240019200",
-    "syncStatus": "ok",
-    "court": { "id": "...", "name": "JUZGADO 002 CIVIL..." },
-    "processType": "De Ejecución",
-    "currentStatus": "Fijacion estado",
-    "lastCourtActionAt": "2026-03-20T00:00:00Z",
-    "subjects": [...],
-    "actions": [...],
-    "createdAt": "2026-05-26T20:00:00Z"
-  },
-  "error": null
+  "id": "uuid",
+  "fileNumber": "17001400301020240019200",
+  "syncStatus": "ok",
+  "court": { "id": "...", "name": "JUZGADO 002 CIVIL..." },
+  "processType": "De Ejecución",
+  "currentStatus": "Fijacion estado",
+  "lastCourtActionAt": "2026-03-20T00:00:00Z",
+  "subjects": [...],
+  "actions": [...],
+  "createdAt": "2026-05-26T20:00:00Z"
 }
 ```
 
@@ -1066,20 +1063,22 @@ Permite al frontend saber si el usuario tiene una importación en curso para blo
 
 ```json
 {
-  "data": {
-    "hasActive": true,
-    "importJob": {
-      "id": "uuid",
-      "fileName": "portafolio.xlsx",
-      "totalRows": 87,
-      "processedRows": 34,
-      "status": "running",
-      "createdAt": "..."
-    }
-  },
-  "error": null
+  "hasActive": true,
+  "importJob": {
+    "id": "uuid",
+    "fileName": "portafolio.xlsx",
+    "totalRows": 87,
+    "processedRows": 34,
+    "successCount": 0,
+    "errorCount": 0,
+    "status": "running",
+    "errors": [],
+    "createdAt": "...",
+    "completedAt": null
+  }
 }
 ```
+> Contrato canónico de `/imports/active`: **`{ hasActive: boolean, importJob: {...} | null }`** (sin envelope). Cuando no hay import en curso: `{ "hasActive": false, "importJob": null }`.
 
 Si `hasActive = true`, el frontend deshabilita el botón "Agregar Proceso" con tooltip: "Hay una importación en curso. Espera a que termine antes de agregar procesos manualmente."
 
@@ -1091,19 +1090,16 @@ GET /api/v1/processes/novelties?page=1&pageSize=20
 
 ```json
 {
-  "data": {
-    "items": [
-      {
-        "id": "uuid",
-        "fileNumber": "17001400301020240019200",
-        "currentStatus": "Fijacion estado",
-        "lastCourtActionAt": "2026-03-20T00:00:00Z",
-        "courtName": "JUZGADO 002 CIVIL MUNICIPAL DE EJECUCIÓN DE SENTENCIAS DE MANIZALES"
-      }
-    ],
-    "total": 5, "page": 1, "pageSize": 20, "totalPages": 1
-  },
-  "error": null
+  "items": [
+    {
+      "id": "uuid",
+      "fileNumber": "17001400301020240019200",
+      "currentStatus": "Fijacion estado",
+      "lastCourtActionAt": "2026-03-20T00:00:00Z",
+      "courtName": "JUZGADO 002 CIVIL MUNICIPAL DE EJECUCIÓN DE SENTENCIAS DE MANIZALES"
+    }
+  ],
+  "total": 5, "page": 1, "pageSize": 20, "totalPages": 1
 }
 ```
 
@@ -1124,37 +1120,34 @@ GET /api/v1/processes?page=1&pageSize=20
 
 ```json
 {
-  "data": {
-    "id": "...", "fileNumber": "...", "alias": "...",
-    "court": { "id": "...", "name": "...", "cityName": "Manizales", "departmentName": "Caldas" },
-    "filingYear": 2024,
-    "processType": "De Ejecución",
-    "processClass": "Ejecutivo Singular",
-    "judgeName": "...",
-    "currentStatus": "...",
-    "lastCourtActionAt": "...",
-    "attended": false,
-    "syncStatus": "ok",                   // "ok" | "partial" | "pending" | "error" | "not_found"
-    "syncPhase": "idle",                  // info adicional para debugging
-    "canDownloadPdf": true,               // false si syncStatus != 'ok'
-    "subjects": [
-      { "type": "Demandante", "name": "OSCAR ARTURO ORTIZ HENAO" },
-      { "type": "Demandado", "name": "FRANCISCA HELENA GONZALEZ ARIAS" }
-    ],
-    "actions": [
-      {
-        "id": "...",
-        "consecutiveNumber": 82,
-        "actionDate": "2026-03-20",
-        "action": "Fijacion estado",
-        "annotation": "...",
-        "termStartDate": "2026-03-24",
-        "termEndDate": "2026-03-24",
-        "groupedWithId": null
-      }
-    ]
-  },
-  "error": null
+  "id": "...", "fileNumber": "...", "alias": "...",
+  "court": { "id": "...", "name": "...", "cityName": "Manizales", "departmentName": "Caldas" },
+  "filingYear": 2024,
+  "processType": "De Ejecución",
+  "processClass": "Ejecutivo Singular",
+  "judgeName": "...",
+  "currentStatus": "...",
+  "lastCourtActionAt": "...",
+  "attended": false,
+  "syncStatus": "ok",                   // "ok" | "partial" | "pending" | "error" | "not_found"
+  "syncPhase": "idle",                  // info adicional para debugging
+  "canDownloadPdf": true,               // false si syncStatus != 'ok'
+  "subjects": [
+    { "type": "Demandante", "name": "OSCAR ARTURO ORTIZ HENAO" },
+    { "type": "Demandado", "name": "FRANCISCA HELENA GONZALEZ ARIAS" }
+  ],
+  "actions": [
+    {
+      "id": "...",
+      "consecutiveNumber": 82,
+      "actionDate": "2026-03-20",
+      "action": "Fijacion estado",
+      "annotation": "...",
+      "termStartDate": "2026-03-24",
+      "termEndDate": "2026-03-24",
+      "groupedWithId": null
+    }
+  ]
 }
 ```
 
@@ -2415,11 +2408,10 @@ Crear `Directory.Build.props` con:
    - Crea `ImportJob` con `status='pending'`.
    - Encola `BulkImportJob(importJobId)` en cola `bulk_import`.
    - Devuelve 202 Accepted con `{ importJobId, status: 'pending' }`.
-5. **`GET /imports/active`** — endpoint **único** que el frontend usa para todo el ciclo del import:
-   - Devuelve el job activo del usuario (status `pending` o `running`) con campos: `{ id, fileName, totalRows, processedRows, successCount, errorCount, status, errors, createdAt, completedAt }`.
-   - Si el último job del usuario terminó hace **menos de 60 segundos**, también lo devuelve con `status='completed'` (ventana corta para que el frontend pueda detectar la finalización vía polling y disparar el popup + refresh).
-   - Después de esos 60 segundos: devuelve `null`.
-   - Devuelve `null` si nunca ha habido import o el último ya pasó la ventana de 60s.
+5. **`GET /imports/active`** — endpoint **único** que el frontend usa para todo el ciclo del import. Contrato canónico (ver §5): **`{ hasActive: boolean, importJob: {...} | null }`**, sin envelope.
+   - Si hay job en curso (`pending`/`running`): `hasActive=true` e `importJob` con campos `{ id, fileName, totalRows, processedRows, successCount, errorCount, status, errors, createdAt, completedAt }`.
+   - Si el último job terminó hace **menos de 60 segundos**: también `hasActive=true` con `importJob.status='completed'` (ventana corta para que el frontend detecte la finalización vía polling y dispare popup + refresh).
+   - Pasados esos 60s, o si nunca hubo import: **`{ hasActive: false, importJob: null }`**.
 6. `GET /imports/{id}` — opcional, solo para consulta directa de un job específico (link desde email, historial). No se usa en el flujo principal.
 7. `BulkImportJob`:
    - `UPDATE import_jobs SET status='running'` al inicio.
