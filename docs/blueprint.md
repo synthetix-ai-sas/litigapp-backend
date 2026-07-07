@@ -925,6 +925,8 @@ Convenciones:
 - Base path: `/api/v1`
 - Auth: JWT Bearer en `Authorization: Bearer <token>` para todo excepto `/auth/*` y `/health`. Aplicar con `.RequireAuthorization()` en el `MapGroup`.
 - Paginación: `?page=1&pageSize=20` con respuesta `{ items, total, page, pageSize, totalPages }`
+- **Sin envelope**: las respuestas exitosas devuelven el DTO/recurso **directamente** (o `{ items, total, ... }` en listados); los errores usan **ProblemDetails**. ⚠️ Algunos ejemplos JSON de esta sección todavía muestran un sobre `{ "data": ..., "error": null }` — ese sobre está **DESACTUALIZADO, no se implementa; ignorarlo**. El backend real no lo usa (usa ProblemDetails para errores).
+- **Nombres consistentes**: usar `totalRows` (no `rowCount`) para conteos de filas, alineado con `import_jobs` y los estados de job.
 
 **Patrón de endpoint** (ejemplo):
 
@@ -1179,15 +1181,16 @@ file=@portafolio.xlsx
 
 ```json
 {
-  "data": {
-    "previewId": "tmp-uuid-cached-10min",
-    "columns": ["A: Radicado", "B: Juzgado", "C: Cliente", "D: Estado"],
-    "rowCount": 87,
-    "previewRows": [
-      { "A": "17001...", "B": "Juzgado 1 Civil...", "C": "...", "D": "..." }
-    ]
-  },
-  "error": null
+  "previewId": "tmp-uuid-cached-10min",
+  "columns": [
+    { "key": "A", "header": "DEPENDENCIA" },
+    { "key": "B", "header": "NUMERO DE PROCESO" },
+    { "key": "F", "header": "JUZGADO/CIUDAD" }
+  ],
+  "rows": [
+    { "A": "PROMISCUOS", "B": "17873408900120240056300", "F": "Juzgado 01 Promiscuo Municipal - Caldas - Villamaría" }
+  ],
+  "totalRows": 51
 }
 ```
 
@@ -2398,7 +2401,7 @@ Crear `Directory.Build.props` con:
 - **Validación en el controller** ANTES de leer con ClosedXML:
   - `[RequestSizeLimit(2 * 1024 * 1024)]` en el endpoint multipart.
   - Si excede tamaño → 413 Payload Too Large.
-- **Validación tras parse**: si `rowCount > MaxRows` → 422 con `error.code='TOO_MANY_ROWS'`.
+- **Validación tras parse**: si `totalRows > MaxRows` → 422 con ProblemDetails (`code='TOO_MANY_ROWS'`).
 - Rationale: ClosedXML carga el DOM completo en memoria. 2MB + 5000 filas cubre el 99.99% de portafolios reales de un abogado individual.
 - **Si en producción real vemos OOMs**: migrar a `ExcelDataReader` (streaming, más eficiente, API menos amigable). Documentado pero NO se hace en MVP.
 
@@ -2471,7 +2474,13 @@ Crear `Directory.Build.props` con:
    (notificación extra-app, sirve si cerró el navegador).
 ```
 
-**Implementación del banner** (Angular): servicio singleton `ImportProgressService` con un signal `activeImport = signal<ImportJobStatus | null>(null)`. Al cargar el dashboard se llama `/imports/active` una vez para hidratar el signal. Si hay job activo arranca el polling. El componente `<global-import-banner>` se renderiza condicionalmente en `dashboard.component.html` justo bajo el header.
+**Implementación del banner** (Angular): servicio singleton `ImportProgressService` con un signal `activeImport = signal<ImportJobStatus | null>(null)`.
+
+**Polling — reglas estrictas (NO ocioso):**
+- El polling a `GET /imports/active` **solo arranca cuando el usuario inicia un import** (tras `POST /imports` exitoso, usando el `importJobId` devuelto).
+- Se **auto-detiene** apenas la respuesta trae `status='completed'` o `'failed'` (o ante error de red) — hacer `clearInterval`/completar el stream ahí mismo. Jamás un `setInterval` perpetuo atado solo a `ngOnDestroy`.
+- En estado idle (sin import en curso) el dashboard **NO llama** `/imports/active`. **Cero polling de fondo.** El caso "el usuario cerró la app durante el import" lo cubre el **email** de finalización, no un polling permanente.
+- La lógica de polling vive en el `ImportProgressService`, **no** en `dashboard.component` (que solo lee el signal). El componente `<global-import-banner>` se renderiza condicionalmente en `dashboard.component.html` (bajo el header) leyendo ese signal.
 
 **Bloqueo en el backend (defensa en profundidad)**: aunque el frontend deshabilita el botón, los endpoints `POST /processes/full-number` y `/wizard` también validan que no haya import activo del usuario → devuelven 409 con `error.code='IMPORT_IN_PROGRESS'` si alguien intenta llamar la API directamente (curl, Postman, segunda pestaña abierta). Esto evita race conditions y mal uso.
 
