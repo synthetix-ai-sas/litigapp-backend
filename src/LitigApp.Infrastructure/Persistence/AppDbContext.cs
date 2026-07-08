@@ -39,6 +39,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
     // Auth
     public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
+    public DbSet<LegalAcceptance> LegalAcceptances { get; set; } = null!;
 
     // Sync
     public DbSet<SyncState> SyncStates { get; set; } = null!;

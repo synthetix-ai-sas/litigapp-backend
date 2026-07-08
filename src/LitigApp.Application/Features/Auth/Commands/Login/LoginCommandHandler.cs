@@ -25,6 +25,10 @@ public sealed class LoginCommandHandler : ICommandHandler<LoginCommand, AuthToke
         _dateTimeProvider = dateTimeProvider;
     }
 
+    // TODO: §9.5 requiresReacceptance — after successful credential check, query legal_acceptances
+    // for the user's latest accepted version per document_type and compare against
+    // LegalOptions.TermsVersion / PrivacyVersion. If any is stale, include
+    // requiresReacceptance: true in AuthTokensResponse so the frontend can prompt re-acceptance.
     public async Task<Result<AuthTokensResponse>> HandleAsync(LoginCommand command, CancellationToken ct = default)
     {
         var userId = await _identityService.ValidateCredentialsAsync(command.Email, command.Password, ct);

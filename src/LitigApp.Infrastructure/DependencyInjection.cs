@@ -49,6 +49,11 @@ public static class DependencyInjection
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
+            services.AddOptions<LitigApp.Infrastructure.Identity.LegalOptions>()
+                .BindConfiguration(LitigApp.Infrastructure.Identity.LegalOptions.SectionName)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
             services.AddHttpContextAccessor();
             services.AddScoped<IJwtTokenService, JwtTokenService>();
             services.AddScoped<ICurrentUserService, CurrentUserService>();

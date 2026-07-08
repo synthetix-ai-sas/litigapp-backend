@@ -8,10 +8,20 @@ using LitigApp.Application.Features.Auth.Commands.RefreshToken;
 using LitigApp.Application.Features.Auth.Commands.RequestPasswordReset;
 using LitigApp.Application.Features.Auth.Commands.ResetPassword;
 using LitigApp.Domain.Common;
+using LitigApp.Infrastructure.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace LitigApp.Api.Features.Auth;
+
+public record RegisterRequest(
+    string Email,
+    string Password,
+    string FullName,
+    string? WhatsAppPhone,
+    bool AcceptedTerms,
+    bool AcceptedPrivacy);
 
 public static class AuthEndpoints
 {
@@ -26,6 +36,7 @@ public static class AuthEndpoints
             .Produces<AuthTokensResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .AllowAnonymous();
 
         group.MapPost("/login", LoginAsync)
@@ -66,18 +77,40 @@ public static class AuthEndpoints
     }
 
     private static async Task<IResult> RegisterAsync(
-        [FromBody] RegisterCommand command,
+        [FromBody] RegisterRequest request,
+        HttpContext httpContext,
+        IOptions<LegalOptions> legalOptions,
         ICommandHandler<RegisterCommand, AuthTokensResponse> handler,
         CancellationToken ct)
     {
+        var legal = legalOptions.Value;
+        var command = new RegisterCommand(
+            request.Email,
+            request.Password,
+            request.FullName,
+            request.WhatsAppPhone,
+            request.AcceptedTerms,
+            request.AcceptedPrivacy,
+            GetClientIp(httpContext),
+            legal.TermsVersion,
+            legal.PrivacyVersion);
+
         var result = await handler.HandleAsync(command, ct);
 
-        return result.IsSuccess
-            ? TypedResults.Created((string?)null, result.Value)
-            : TypedResults.Problem(
-                detail: result.Error,
-                statusCode: StatusCodes.Status409Conflict,
-                title: "Registration failed.");
+        if (result.IsSuccess)
+            return TypedResults.Created((string?)null, result.Value);
+
+        if (result.Error == "LEGAL_NOT_ACCEPTED")
+            return TypedResults.Problem(
+                detail: "You must accept the Terms of Service and Privacy Policy to create an account.",
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                title: "Legal consent required.",
+                extensions: new Dictionary<string, object?> { ["code"] = "LEGAL_NOT_ACCEPTED" });
+
+        return TypedResults.Problem(
+            detail: result.Error,
+            statusCode: StatusCodes.Status409Conflict,
+            title: "Registration failed.");
     }
 
     private static async Task<IResult> LoginAsync(
@@ -139,6 +172,14 @@ public static class AuthEndpoints
                 detail: result.Error,
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Password reset failed.");
+    }
+
+    private static string? GetClientIp(HttpContext ctx)
+    {
+        var forwarded = ctx.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(forwarded))
+            return forwarded.Split(',')[0].Trim();
+        return ctx.Connection.RemoteIpAddress?.ToString();
     }
 }
 

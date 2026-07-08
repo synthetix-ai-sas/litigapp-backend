@@ -22,13 +22,36 @@ public class RegisterCommandHandlerTests
         _sut = new RegisterCommandHandler(_identityService, _jwtTokenService, _authRepository, _dateTimeProvider);
     }
 
+    private static RegisterCommand ValidCmd(
+        string email = "new@example.com",
+        string password = "password123",
+        string fullName = "Juan Pérez",
+        string? phone = null,
+        bool acceptedTerms = true,
+        bool acceptedPrivacy = true) =>
+        new(email, password, fullName, phone, acceptedTerms, acceptedPrivacy, "127.0.0.1", "v1.0", "v1.0");
+
+    [Fact]
+    public async Task HandleAsync_WhenLegalNotAccepted_ReturnsFailureWithoutCreatingUser()
+    {
+        var cmd = ValidCmd(acceptedTerms: false);
+
+        var result = await _sut.HandleAsync(cmd);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("LEGAL_NOT_ACCEPTED", result.Error);
+        await _identityService.DidNotReceive().IsEmailRegisteredAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _identityService.DidNotReceive().CreateUserAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task HandleAsync_WhenEmailAlreadyTaken_ReturnsFailure()
     {
         _identityService.IsEmailRegisteredAsync("taken@example.com", Arg.Any<CancellationToken>())
             .Returns(true);
 
-        var result = await _sut.HandleAsync(new RegisterCommand("taken@example.com", "password123", "Juan", null));
+        var result = await _sut.HandleAsync(ValidCmd(email: "taken@example.com"));
 
         Assert.False(result.IsSuccess);
         Assert.NotNull(result.Error);
@@ -44,7 +67,7 @@ public class RegisterCommandHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(new IdentityOperationResult(false, null, "Password too weak."));
 
-        var result = await _sut.HandleAsync(new RegisterCommand("new@example.com", "weak", "Juan", null));
+        var result = await _sut.HandleAsync(ValidCmd(password: "weak"));
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Password too weak.", result.Error);
@@ -71,7 +94,7 @@ public class RegisterCommandHandlerTests
         _jwtTokenService.HashRefreshToken(rawRefresh).Returns(hashedRefresh);
         _dateTimeProvider.UtcNow.Returns(new DateTime(2026, 6, 12, 0, 0, 0, DateTimeKind.Utc));
 
-        var result = await _sut.HandleAsync(new RegisterCommand("new@example.com", "password123", "Juan Pérez", "+573001234567"));
+        var result = await _sut.HandleAsync(ValidCmd(phone: "+573001234567"));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(accessToken, result.Value!.AccessToken);
@@ -87,13 +110,44 @@ public class RegisterCommandHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_WhenSuccessful_PersistsTwoLegalAcceptanceRows()
+    {
+        const string userId = "user-abc";
+        _identityService.IsEmailRegisteredAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(false);
+        _identityService.CreateUserAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new IdentityOperationResult(true, userId, null));
+        _identityService.GetUserRolesAsync(userId, Arg.Any<CancellationToken>())
+            .Returns(new List<string> { "User" });
+        _jwtTokenService.GenerateAccessToken(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IEnumerable<string>>()).Returns("tok");
+        _jwtTokenService.GenerateRefreshToken().Returns("raw");
+        _jwtTokenService.HashRefreshToken(Arg.Any<string>()).Returns("hash");
+        _dateTimeProvider.UtcNow.Returns(new DateTime(2026, 6, 12, 0, 0, 0, DateTimeKind.Utc));
+
+        await _sut.HandleAsync(ValidCmd());
+
+        await _authRepository.Received(1).AddLegalAcceptanceAsync(
+            Arg.Is<Domain.Auth.LegalAcceptance>(la =>
+                la.UserId == userId &&
+                la.DocumentType == "terms" &&
+                la.DocumentVersion == "v1.0"),
+            Arg.Any<CancellationToken>());
+
+        await _authRepository.Received(1).AddLegalAcceptanceAsync(
+            Arg.Is<Domain.Auth.LegalAcceptance>(la =>
+                la.UserId == userId &&
+                la.DocumentType == "privacy" &&
+                la.DocumentVersion == "v1.0"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task HandleAsync_WhenSuccessful_DoesNotPersistTokenIfCreateFails()
     {
         _identityService.IsEmailRegisteredAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(false);
         _identityService.CreateUserAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new IdentityOperationResult(false, null, "Error."));
 
-        await _sut.HandleAsync(new RegisterCommand("new@example.com", "password123", "Juan", null));
+        await _sut.HandleAsync(ValidCmd());
 
         await _authRepository.DidNotReceive().AddRefreshTokenAsync(
             Arg.Any<Domain.Auth.RefreshToken>(), Arg.Any<CancellationToken>());
