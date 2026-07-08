@@ -4,6 +4,7 @@ using System.Net;
 using LitigApp.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LitigApp.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260704015354_AlterLegalAcceptancesInetAndFk")]
+    partial class AlterLegalAcceptancesInetAndFk
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -330,10 +333,6 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("file_name");
 
-                    b.Property<Guid>("PreviewId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("preview_id");
-
                     b.Property<int>("ProcessedRows")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -352,10 +351,6 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0)
                         .HasColumnName("success_count");
-
-                    b.Property<string>("SyncError")
-                        .HasColumnType("text")
-                        .HasColumnName("sync_error");
 
                     b.Property<int>("TotalRows")
                         .ValueGeneratedOnAdd()

@@ -17,6 +17,14 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
         RuleFor(x => x.FullName)
             .NotEmpty();
 
+        RuleFor(x => x.AcceptedTerms)
+            .Equal(true)
+            .WithMessage("You must accept the Terms and Conditions.");
+
+        RuleFor(x => x.AcceptedPrivacy)
+            .Equal(true)
+            .WithMessage("You must accept the Privacy Policy.");
+
         When(x => x.WhatsAppPhone is not null, () =>
         {
             RuleFor(x => x.WhatsAppPhone!)

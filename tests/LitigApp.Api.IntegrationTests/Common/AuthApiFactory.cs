@@ -32,7 +32,10 @@ public sealed class AuthApiFactory : WebApplicationFactory<Program>, IAsyncLifet
                 ["Jwt:Issuer"] = TestJwtIssuer,
                 ["Jwt:Audience"] = TestJwtAudience,
                 ["Jwt:AccessTokenMinutes"] = "15",
-                ["Jwt:RefreshTokenDays"] = "7"
+                ["Jwt:RefreshTokenDays"] = "7",
+                ["Legal:TermsVersion"] = "v1.0",
+                ["Legal:PrivacyVersion"] = "v1.0",
+                ["Legal:DataProtectionEmail"] = "test@example.com"
             });
         });
     }
