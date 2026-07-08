@@ -1189,26 +1189,22 @@ file=@portafolio.xlsx
 
 #### POST `/api/v1/imports`
 
+**Request** — contrato v1 radicado-first (canónico). El `mapping` SOLO tiene `radicadoCol` (obligatorio) y `notesCol` (opcional). Los campos de composición por partes (año/ciudad/juzgado/consecutivo) son **v2** y NO van en v1 (ver §9 estrategia de importación):
+
 ```json
 {
   "previewId": "tmp-uuid-cached-10min",
   "mapping": {
-    "fileNumberColumn": "A",
-    "filingYearColumn": null,
-    "cityColumn": "B",
-    "courtColumn": "B",
-    "consecutiveColumn": "A",
-    "demandantColumn": "C",
-    "demandadoColumn": "D",
-    "aliasColumn": null
+    "radicadoCol": "B",
+    "notesCol": "I"
   },
-  "fileNumberMode": "full" | "compose"   
-  // "full" = la columna trae los 23 dígitos
-  // "compose" = hay que construirlos a partir de otras columnas
+  "fileName": "portafolio.xlsx"
 }
 ```
 
-**Respuesta**: 202 Accepted con `{ importJobId }`. Frontend hace polling a GET `/imports/{id}`.
+Coincide con el backend: `ExecuteImportRequest(Guid PreviewId, ColumnMappingRequest Mapping, string? FileName)` y `ColumnMappingRequest(string RadicadoCol, string? NotesCol)`. NO existe `fileNumberMode` en v1 (toda fila sin radicado de 23 díg. → carga manual, no se compone).
+
+**Respuesta**: 202 Accepted con `{ "importJobId": "uuid", "status": "pending" }`. El frontend hace polling a **GET `/imports/active`** (no a `/imports/{id}`), según §9.
 
 ---
 
