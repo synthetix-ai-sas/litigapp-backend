@@ -34,6 +34,19 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("Postgres")
             ?? throw new InvalidOperationException("Connection string 'Postgres' is not configured.");
 
+        // Cap the Npgsql pool so api + worker together stay under the database connection
+        // limit (Supabase free-tier session pooler = 15). EF Core and Hangfire share this
+        // pool (same connection string), so this caps both. Budget: api pool + worker pool +
+        // headroom ≤ the plan's limit. Overridable per environment; null → Npgsql default (100).
+        var maxPoolSize = configuration.GetValue<int?>("Database:MaxPoolSize");
+        if (maxPoolSize is int poolSize)
+        {
+            connectionString = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
+            {
+                MaxPoolSize = poolSize,
+            }.ConnectionString;
+        }
+
         services.AddDbContext<AppDbContext>(options =>
             options
                 .UseNpgsql(connectionString)

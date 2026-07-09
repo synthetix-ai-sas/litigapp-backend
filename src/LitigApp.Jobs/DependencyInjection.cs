@@ -48,8 +48,12 @@ public static class DependencyInjection
                     "default"
                 ]
                 : ["notifications", "default"];
+            // Worker count drives how many jobs run (and thus DB connections) at once. Keep it
+            // within the pool budget (see Database:MaxPoolSize) — the default is fine for a big
+            // DB but must be lowered for Supabase free tier. The api role stays light.
+            var configuredWorkers = configuration.GetValue<int?>("Hangfire:WorkerCount");
             opts.WorkerCount = isWorker
-                ? Math.Max(Environment.ProcessorCount * 2, 4)
+                ? (configuredWorkers is int w && w > 0 ? w : Math.Max(Environment.ProcessorCount * 2, 4))
                 : 2;
         });
 
