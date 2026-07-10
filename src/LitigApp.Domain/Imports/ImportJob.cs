@@ -25,8 +25,16 @@ public class ImportJob
     /// <summary>Job-level failure reason (e.g. "preview_expired").</summary>
     public string? SyncError { get; set; }
 
-    /// <summary>Links back to the cached preview (in-memory TTL 10 min; used for WAF resume).</summary>
+    /// <summary>Correlation id of the preview this job came from (traceability only).</summary>
     public Guid PreviewId { get; set; }
+
+    /// <summary>
+    /// The confirmed import rows reduced to the mapped columns, as JSON
+    /// (<c>[{ "radicado": ..., "notes": ... }]</c>). Persisted here so the worker
+    /// process — which does not share the API's in-memory preview cache — can run
+    /// the import, and so it survives WAF pause/resume. See spec A1 (4.C).
+    /// </summary>
+    public string? PreviewPayload { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }

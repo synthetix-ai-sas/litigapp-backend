@@ -334,6 +334,11 @@ internal sealed class RamaJudicialClient : IRamaJudicialClient
             if (message.Contains("ha de contener", StringComparison.OrdinalIgnoreCase))
                 return (FailureKind.InvalidInput, message);
 
+            // "No se puede ver el detalle de un proceso privado" — private process (blueprint
+            // "Manejo de procesos privados"). Terminal & known: never retry, never mark error.
+            if (message.Contains("privado", StringComparison.OrdinalIgnoreCase))
+                return (FailureKind.Private, message);
+
             return (FailureKind.NotFound, message);
         }
 

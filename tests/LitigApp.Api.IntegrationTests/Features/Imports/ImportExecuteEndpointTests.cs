@@ -6,6 +6,7 @@ using FluentAssertions;
 using LitigApp.Api.IntegrationTests.Common;
 using LitigApp.Domain.Imports;
 using LitigApp.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LitigApp.Api.IntegrationTests.Features.Imports;
@@ -47,6 +48,13 @@ public sealed class ImportExecuteEndpointTests(ApiFactory factory) : IClassFixtu
         var body = await executeResp.Content.ReadFromJsonAsync<ExecuteDto>();
         body!.ImportJobId.Should().NotBeEmpty();
         body.Status.Should().Be(ImportStatus.Pending);
+
+        // The mapped rows must be persisted so the worker (separate process) can read them.
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var saved = await db.ImportJobs.AsNoTracking().FirstAsync(j => j.Id == body.ImportJobId);
+        saved.PreviewPayload.Should().NotBeNullOrEmpty();
+        saved.PreviewPayload.Should().Contain("v00"); // radicado value from BuildXlsx row 0, col A
     }
 
     [Fact]

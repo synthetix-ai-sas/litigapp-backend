@@ -70,6 +70,23 @@ public sealed class ProcessCreationService(
             UpdatedAt = now,
         };
 
+        // ⚠️ Private process (blueprint "Manejo de procesos privados"): the overview returns
+        // esPrivado=true and the other 3 endpoints (detail/subjects/actions) all respond 404.
+        // Persist ONLY the overview — no further calls, no process_subjects/process_actions rows.
+        // This is a normal, terminal state (sync_status='ok', idle), not a partial fetch.
+        if (overview.IsPrivate)
+        {
+            process.SyncStatus = ProcessSyncStatus.Ok;
+            process.SyncPhase = ProcessSyncPhase.Idle;
+            process.LastSyncedAt = now;
+
+            await repository.AddAsync(process, ct);
+            await repository.SaveChangesAsync(ct);
+
+            var privateDto = await reader.GetByIdAsync(userId, process.Id, ct);
+            return Result<ProcessDetailDto>.Success(privateDto!);
+        }
+
         var missing = new List<string>();
 
         var detailResult = await rama.GetDetailAsync(overview.ExternalProcessId, ct);
@@ -90,7 +107,10 @@ public sealed class ProcessCreationService(
         var subjectsResult = await rama.GetSubjectsAsync(overview.ExternalProcessId, ct);
         if (subjectsResult.IsSuccess && subjectsResult.Value is { } subjects)
         {
-            foreach (var s in subjects)
+            // Defense: never insert a subject with a null/blank subject_type — the column is
+            // NOT NULL by design. A malformed entry (e.g. a "PROCESO PRIVADO" placeholder) is
+            // discarded rather than crashing the whole SaveChanges. (Blueprint §creación.)
+            foreach (var s in subjects.Where(s => !string.IsNullOrWhiteSpace(s.SubjectType)))
                 process.Subjects.Add(ProcessSubjectFactory.Create(s, process.Id, now));
         }
         else

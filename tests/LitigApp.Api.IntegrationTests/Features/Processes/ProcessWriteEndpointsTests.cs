@@ -4,15 +4,23 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
 using LitigApp.Api.IntegrationTests.Common;
+using LitigApp.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LitigApp.Api.IntegrationTests.Features.Processes;
 
 public sealed class ProcessWriteEndpointsTests : IClassFixture<ApiFactory>
 {
+    private readonly ApiFactory _factory;
     private readonly HttpClient _client;
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
-    public ProcessWriteEndpointsTests(ApiFactory factory) => _client = factory.CreateClient();
+    public ProcessWriteEndpointsTests(ApiFactory factory)
+    {
+        _factory = factory;
+        _client = factory.CreateClient();
+    }
 
     private void SetAuthHeader() =>
         _client.DefaultRequestHeaders.Authorization =
@@ -48,6 +56,7 @@ public sealed class ProcessWriteEndpointsTests : IClassFixture<ApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var root = Root(await response.Content.ReadAsStringAsync());
         root.GetProperty("syncStatus").GetString().Should().Be("ok");
+        root.GetProperty("isPrivate").GetBoolean().Should().BeFalse();
         root.GetProperty("canDownloadPdf").GetBoolean().Should().BeTrue();
         root.GetProperty("subjects").GetArrayLength().Should().Be(2);
         root.GetProperty("actions").GetArrayLength().Should().Be(1);
@@ -74,6 +83,39 @@ public sealed class ProcessWriteEndpointsTests : IClassFixture<ApiFactory>
         var root = Root(await response.Content.ReadAsStringAsync());
         root.GetProperty("syncStatus").GetString().Should().Be("partial");
         root.GetProperty("canDownloadPdf").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CreateFullNumber_PrivateProcess_Persists201Ok_WithNoSubjectsOrActions()
+    {
+        SetAuthHeader();
+        // "88888" triggers the fake's private overview (esPrivado=true); the fake's
+        // detail/subjects/actions all 404 for it, so a status of "ok" (not "partial")
+        // proves those 3 endpoints were never called.
+        const string privateFileNumber = "17001400301088888000904";
+        var response = await _client.PostAsJsonAsync("/api/v1/processes/full-number",
+            new { fileNumber = privateFileNumber, alias = "Privado demo" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var root = Root(await response.Content.ReadAsStringAsync());
+        root.GetProperty("syncStatus").GetString().Should().Be("ok");
+        root.GetProperty("isPrivate").GetBoolean().Should().BeTrue();
+        // Private processes expose no subjects/actions → PDF has nothing to render.
+        root.GetProperty("canDownloadPdf").GetBoolean().Should().BeFalse();
+        root.GetProperty("subjects").GetArrayLength().Should().Be(0);
+        root.GetProperty("actions").GetArrayLength().Should().Be(0);
+
+        // DB-level: persisted as private, idle, with ZERO subject/action rows.
+        var id = root.GetProperty("id").GetGuid();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var process = await db.Processes.AsNoTracking().FirstAsync(p => p.Id == id);
+        process.IsPrivate.Should().BeTrue();
+        process.SyncStatus.Should().Be("ok");
+        process.SyncPhase.Should().Be("idle");
+        process.LastCourtActionAt.Should().BeNull();
+        (await db.ProcessSubjects.CountAsync(s => s.ProcessId == id)).Should().Be(0);
+        (await db.ProcessActions.CountAsync(a => a.ProcessId == id)).Should().Be(0);
     }
 
     [Fact]

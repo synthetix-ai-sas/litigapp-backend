@@ -112,16 +112,22 @@ public static class ImportsEndpoints
             notesCol    = request.Mapping.NotesCol,
         });
 
+        // Reduce the preview to the mapped columns and persist it on the job, so the worker
+        // (separate process, no shared in-memory cache) can run the import. See spec A1 (4.C).
+        var importRows = ImportPreviewProjection.Project(
+            preview, request.Mapping.RadicadoCol, request.Mapping.NotesCol);
+
         var job = await importRepo.CreateAsync(new ImportJob
         {
-            Id            = Guid.NewGuid(),
-            UserId        = userId,
-            FileName      = request.FileName ?? preview.FileName,
-            TotalRows     = preview.Rows.Count,
-            Status        = ImportStatus.Pending,
-            ColumnMapping = mapping,
-            PreviewId     = request.PreviewId,
-            CreatedAt     = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero),
+            Id             = Guid.NewGuid(),
+            UserId         = userId,
+            FileName       = request.FileName ?? preview.FileName,
+            TotalRows      = preview.Rows.Count,
+            Status         = ImportStatus.Pending,
+            ColumnMapping  = mapping,
+            PreviewId      = request.PreviewId,
+            PreviewPayload = JsonSerializer.Serialize(importRows),
+            CreatedAt      = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero),
         }, ct);
 
         scheduler.EnqueueBulkImport(job.Id);

@@ -8,4 +8,5 @@ public sealed record ProcessListItemDto(
     string? CurrentStatus,
     DateTimeOffset? LastCourtActionAt,
     string? CourtName,
-    bool Attended);
+    bool Attended,
+    bool IsPrivate);

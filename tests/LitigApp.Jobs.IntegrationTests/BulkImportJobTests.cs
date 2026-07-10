@@ -1,10 +1,10 @@
+using System.Text.Json;
 using FluentAssertions;
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Application.Features.Imports;
 using LitigApp.Application.Features.Processes.Dtos;
 using LitigApp.Domain.Common;
 using LitigApp.Domain.Imports;
-using LitigApp.Infrastructure.Imports;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Infrastructure.Persistence.Repositories;
 using LitigApp.Infrastructure.Sync;
@@ -12,7 +12,6 @@ using LitigApp.Infrastructure.Time;
 using LitigApp.Jobs;
 using LitigApp.Jobs.ProcessSyncJobs;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
@@ -49,7 +48,7 @@ public sealed class BulkImportJobTests : IAsyncLifetime
     [Fact]
     public async Task Row_With23DigitRadicado_IsImported_SuccessCountIncremented()
     {
-        var (job, cache) = await SetupAndRun(
+        var job = await SetupAndRun(
             [Row("11001310300120230001200")]);  // valid 23-digit
 
         job.Status.Should().Be(ImportStatus.Completed);
@@ -58,9 +57,29 @@ public sealed class BulkImportJobTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task NullPreviewPayload_FailsJob_WithPreviewMissing()
+    {
+        var job = new ImportJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = "user-bulk",
+            FileName = "portafolio.xlsx",
+            Status = ImportStatus.Pending,
+            PreviewId = Guid.NewGuid(),
+            PreviewPayload = null,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        var updated = await PersistAndRun(job);
+
+        updated.Status.Should().Be(ImportStatus.Failed);
+        updated.SyncError.Should().Be("preview_missing");
+    }
+
+    [Fact]
     public async Task Row_WithSicRadicado_IsRejected_WithInvalidRadicadoCode()
     {
-        var (job, _) = await SetupAndRun(
+        var job = await SetupAndRun(
             [Row("25-463759-0")]);  // SIC format, not 23 digits
 
         job.Status.Should().Be(ImportStatus.Completed);
@@ -72,7 +91,7 @@ public sealed class BulkImportJobTests : IAsyncLifetime
     [Fact]
     public async Task Row_With21DigitPenalRadicado_IsRejected()
     {
-        var (job, _) = await SetupAndRun(
+        var job = await SetupAndRun(
             [Row("210016000001202310001")]);  // Fiscalía — 21 digits
 
         job.ErrorCount.Should().Be(1);
@@ -82,7 +101,7 @@ public sealed class BulkImportJobTests : IAsyncLifetime
     [Fact]
     public async Task EmptyRow_IsSkipped_Silently_NeitherSuccessNorError()
     {
-        var (job, _) = await SetupAndRun([
+        var job = await SetupAndRun([
             Row(""),                        // blank → skip
             Row("11001310300120230001201"), // valid
         ]);
@@ -96,7 +115,7 @@ public sealed class BulkImportJobTests : IAsyncLifetime
     public async Task SectionHeaderRow_WithText_IsSkipped_Silently()
     {
         // "RADICADO" text → after stripping non-digits = "" → skip silently.
-        var (job, _) = await SetupAndRun([
+        var job = await SetupAndRun([
             Row("RADICADO"),
             Row("11001310300120230001202"),
         ]);
@@ -108,7 +127,7 @@ public sealed class BulkImportJobTests : IAsyncLifetime
     [Fact]
     public async Task MixedRows_ProcessesEachCorrectly()
     {
-        var (job, _) = await SetupAndRun([
+        var job = await SetupAndRun([
             Row("11001310300120230001203"), // ✅
             Row("25-463759-0"),             // ❌ SIC
             Row(""),                        // ⏭ skip
@@ -123,7 +142,7 @@ public sealed class BulkImportJobTests : IAsyncLifetime
     [Fact]
     public async Task DuplicateRadicado_IsSkippedSilently_NotCountedAsError()
     {
-        var (job, _) = await SetupAndRun(
+        var job = await SetupAndRun(
             [Row("11001310300120230001200")],
             creatorReturns: "DUPLICATE_PROCESS");
 
@@ -137,19 +156,15 @@ public sealed class BulkImportJobTests : IAsyncLifetime
     private static Dictionary<string, string?> Row(string radicado) =>
         new() { ["A"] = radicado };
 
-    private async Task<(ImportJob job, ImportPreviewCache cache)> SetupAndRun(
+    private async Task<ImportJob> SetupAndRun(
         IReadOnlyList<Dictionary<string, string?>> rows,
         string? creatorReturns = null)
     {
-        var cache = new ImportPreviewCache(
-            new MemoryCache(new MemoryCacheOptions()),
-            Options.Create(new ImportOptions()));
-
-        var previewId = Guid.NewGuid();
-        cache.Set(previewId, new ExcelPreview(
+        var preview = new ExcelPreview(
             "portafolio.xlsx",
             [new ExcelColumn("A", "Radicado")],
-            rows.Select(r => (IReadOnlyDictionary<string, string?>)r).ToList()));
+            rows.Select(r => (IReadOnlyDictionary<string, string?>)r).ToList());
+        var importRows = ImportPreviewProjection.Project(preview, radicadoCol: "A", notesCol: null);
 
         var job = new ImportJob
         {
@@ -158,17 +173,22 @@ public sealed class BulkImportJobTests : IAsyncLifetime
             FileName = "portafolio.xlsx",
             TotalRows = rows.Count,
             Status = ImportStatus.Pending,
-            ColumnMapping = """{"radicadoCol":"A","notesCol":null}""",
-            PreviewId = previewId,
+            PreviewId = Guid.NewGuid(),
+            PreviewPayload = JsonSerializer.Serialize(importRows),
             CreatedAt = DateTimeOffset.UtcNow,
         };
+
+        return await PersistAndRun(job, creatorReturns);
+    }
+
+    private async Task<ImportJob> PersistAndRun(ImportJob job, string? creatorReturns = null)
+    {
         _db.ImportJobs.Add(job);
         await _db.SaveChangesAsync();
         _db.ChangeTracker.Clear();
 
         var bulkJob = new BulkImportJob(
             new ImportJobRepository(_db),
-            cache,
             new FakeProcessCreator(creatorReturns),
             new SyncStateService(_db, _clock),
             new RecordingSyncJobScheduler(),
@@ -181,8 +201,7 @@ public sealed class BulkImportJobTests : IAsyncLifetime
 
         await bulkJob.RunAsync(job.Id);
 
-        var updated = await _db.ImportJobs.AsNoTracking().FirstAsync(j => j.Id == job.Id);
-        return (updated, cache);
+        return await _db.ImportJobs.AsNoTracking().FirstAsync(j => j.Id == job.Id);
     }
 
     private sealed class FakeProcessCreator(string? failWith = null) : IProcessCreator
@@ -196,7 +215,7 @@ public sealed class BulkImportJobTests : IAsyncLifetime
             var dto = new ProcessDetailDto(
                 Guid.NewGuid(), fileNumber, null, null, null,
                 null, null, null, null, null,
-                true, "ok", "idle", false, [], []);
+                true, "ok", "idle", false, false, [], []);
 
             return Task.FromResult(Result<ProcessDetailDto>.Success(dto));
         }

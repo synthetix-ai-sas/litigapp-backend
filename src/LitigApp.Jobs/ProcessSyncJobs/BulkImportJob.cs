@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Hangfire;
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Features.Imports;
 using LitigApp.Domain.Imports;
 using LitigApp.Domain.Notifications;
 using Microsoft.Extensions.Logging;
@@ -17,7 +18,6 @@ namespace LitigApp.Jobs.ProcessSyncJobs;
 [DisableConcurrentExecution(timeoutInSeconds: 60 * 60)] // imports can take up to 1h
 public sealed class BulkImportJob(
     IImportJobRepository importRepo,
-    IImportPreviewCache previewCache,
     IProcessCreator processCreator,
     ISyncStateService syncState,
     ISyncJobScheduler scheduler,
@@ -30,6 +30,8 @@ public sealed class BulkImportJob(
 {
     // Regex to strip everything that is not a decimal digit.
     private static readonly Regex NonDigit = new(@"\D", RegexOptions.Compiled);
+
+    private static readonly JsonSerializerOptions PayloadJson = new() { PropertyNameCaseInsensitive = true };
 
     public async Task RunAsync(Guid importJobId, CancellationToken ct = default)
     {
@@ -44,30 +46,23 @@ public sealed class BulkImportJob(
             return;
         }
 
-        // If the job was re-enqueued after a pause, the preview may have expired (10-min TTL).
-        // In that case we cannot continue — mark as failed.
-        var mapping = DeserializeMapping(job.ColumnMapping);
-        if (mapping is null)
+        // The confirmed rows are persisted on the job (spec A1), so the import survives the
+        // API/worker process split and WAF pause/resume. A missing payload is unexpected.
+        var rows = DeserializePayload(job.PreviewPayload);
+        if (rows is null)
         {
-            await FailJobAsync(job, "column_mapping missing or invalid", ct);
-            return;
-        }
-
-        var preview = previewCache.Get(job.PreviewId);
-        if (preview is null)
-        {
-            await FailJobAsync(job, "preview_expired", ct);
+            await FailJobAsync(job, "preview_missing", ct);
             return;
         }
 
         job.Status = ImportStatus.Running;
-        job.TotalRows = preview.Rows.Count;
+        job.TotalRows = rows.Count;
         await importRepo.SaveChangesAsync(ct);
 
         var errors = new List<ImportRowError>();
         var first = true;
 
-        for (var i = 0; i < preview.Rows.Count; i++)
+        for (var i = 0; i < rows.Count; i++)
         {
             if (ct.IsCancellationRequested) break;
 
@@ -85,9 +80,9 @@ public sealed class BulkImportJob(
                 return;
             }
 
-            var row = preview.Rows[i];
-            var rawRadicado = row.TryGetValue(mapping.RadicadoCol, out var rv) ? rv : null;
-            var notes = mapping.NotesCol is not null && row.TryGetValue(mapping.NotesCol, out var nv) ? nv : null;
+            var row = rows[i];
+            var rawRadicado = row.Radicado;
+            var notes = row.Notes;
 
             // Normalize: strip every non-digit character.
             var normalized = rawRadicado is null ? string.Empty : NonDigit.Replace(rawRadicado, string.Empty);
@@ -209,14 +204,12 @@ public sealed class BulkImportJob(
              + TimeSpan.FromMilliseconds(Random.Shared.Next(0, Math.Max(1, jitterMs)));
     }
 
-    private static ColumnMapping? DeserializeMapping(string? json)
+    private static List<ImportRow>? DeserializePayload(string? json)
     {
         if (string.IsNullOrEmpty(json)) return null;
-        try { return JsonSerializer.Deserialize<ColumnMapping>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }); }
+        try { return JsonSerializer.Deserialize<List<ImportRow>>(json, PayloadJson); }
         catch { return null; }
     }
-
-    private sealed record ColumnMapping(string RadicadoCol, string? NotesCol);
 }
 
 public sealed record ImportRowError(int Row, string Radicado, string Code, string Message);
