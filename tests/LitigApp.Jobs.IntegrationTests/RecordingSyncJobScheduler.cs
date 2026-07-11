@@ -26,4 +26,12 @@ public sealed class RecordingSyncJobScheduler : ISyncJobScheduler
     public void EnqueuePartialFetch(Guid processId) => PartialFetchEnqueued++;
 
     public void SchedulePartialFetch(Guid processId, TimeSpan delay) => PartialFetchScheduled++;
+
+    public List<Guid> BulkImportEnqueued { get; } = [];
+    public List<Guid> BulkImportScheduled { get; } = [];
+    public List<Guid> ImportCompleteEnqueued { get; } = [];
+
+    public void EnqueueBulkImport(Guid importJobId) => BulkImportEnqueued.Add(importJobId);
+    public void ScheduleBulkImport(Guid importJobId, TimeSpan delay) => BulkImportScheduled.Add(importJobId);
+    public void EnqueueImportComplete(Guid importJobId) => ImportCompleteEnqueued.Add(importJobId);
 }

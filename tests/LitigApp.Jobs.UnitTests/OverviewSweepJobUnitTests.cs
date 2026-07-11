@@ -174,6 +174,24 @@ public class OverviewSweepJobUnitTests
         await _delay.DidNotReceive().WaitAsync(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task WhenProcessIsPrivate_KeepsIdle_NeverEnqueuesActionsSweep()
+    {
+        var process = Eligible();
+        StubBatch(process);
+        // Private overview carries a *newer* action date on purpose: the private guard must
+        // take precedence over change-detection and never mark pending_actions / enqueue.
+        _client.GetOverviewByFileNumberAsync(process.FileNumber, Arg.Any<CancellationToken>())
+            .Returns(RamaResult<OverviewData?>.Ok(new OverviewData(
+                999, 1, process.FileNumber, Now.AddDays(-1).UtcDateTime, "Juzgado", "Bogotá", IsPrivate: true)));
+
+        await BuildJob().RunAsync();
+
+        Assert.Equal(ProcessSyncPhase.Idle, process.SyncPhase);
+        Assert.True(process.IsPrivate);
+        _scheduler.DidNotReceive().EnqueueActionsSweep();
+    }
+
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private static readonly DateTime NoChange = new(2019, 1, 1, 0, 0, 0, DateTimeKind.Utc);

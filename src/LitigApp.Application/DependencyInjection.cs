@@ -32,6 +32,11 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services, bool isWorker)
     {
+        // Shared synchronous creation flow — used by the HTTP handlers AND by BulkImportJob
+        // on the worker, so it must be registered for both roles.
+        services.AddScoped<ProcessCreationService>();
+        services.AddScoped<IProcessCreator>(sp => sp.GetRequiredService<ProcessCreationService>());
+
         // Only the api role's HTTP endpoints call these; worker jobs hit Infrastructure directly.
         if (!isWorker)
         {
@@ -55,8 +60,7 @@ public static class DependencyInjection
             services.AddScoped<IQueryHandler<ListProcessesQuery, PagedResult<ProcessListItemDto>>, ListProcessesHandler>();
             services.AddScoped<IQueryHandler<GetProcessByIdQuery, ProcessDetailDto?>, GetProcessByIdHandler>();
 
-            // Process command handlers (+ shared creation service)
-            services.AddScoped<ProcessCreationService>();
+            // Process command handlers
             services.AddScoped<ICommandHandler<CreateProcessFromFileNumberCommand, ProcessDetailDto>, CreateProcessFromFileNumberHandler>();
             services.AddScoped<ICommandHandler<CreateProcessFromWizardCommand, ProcessDetailDto>, CreateProcessFromWizardHandler>();
             services.AddScoped<ICommandHandler<MarkAttendedCommand, Unit>, MarkAttendedHandler>();

@@ -77,6 +77,20 @@ public sealed class OverviewSweepJob(
                     process.SyncStatus = ProcessSyncStatus.NotFound;
                     notFound++;
                 }
+                else if (overview.IsPrivate)
+                {
+                    // Private processes can't expose actions (the actions endpoint 404s). Keep
+                    // them idle and NEVER enqueue ActionsSweep (blueprint "Manejo de procesos
+                    // privados"). Guard runs before change-detection so a stray last-action date
+                    // can't promote them to pending_actions.
+                    process.IsPrivate = true;
+                    process.SyncPhase = ProcessSyncPhase.Idle;
+                    process.SyncStatus = ProcessSyncStatus.Ok;
+                    process.LastSyncedAt = now;
+                    process.ExternalProcessId ??= overview.ExternalProcessId;
+                    process.ExternalConnectionId ??= overview.ExternalConnectionId;
+                    noChange++;
+                }
                 else if (overview.LastActionDate.HasValue &&
                          new DateTimeOffset(overview.LastActionDate.Value, TimeSpan.Zero) > process.LastCourtActionAt)
                 {

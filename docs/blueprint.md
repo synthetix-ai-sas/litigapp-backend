@@ -925,6 +925,8 @@ Convenciones:
 - Base path: `/api/v1`
 - Auth: JWT Bearer en `Authorization: Bearer <token>` para todo excepto `/auth/*` y `/health`. Aplicar con `.RequireAuthorization()` en el `MapGroup`.
 - Paginación: `?page=1&pageSize=20` con respuesta `{ items, total, page, pageSize, totalPages }`
+- **Sin envelope**: las respuestas exitosas devuelven el DTO/recurso **directamente** (o `{ items, total, ... }` en listados); los errores usan **ProblemDetails**. ⚠️ Algunos ejemplos JSON de esta sección todavía muestran un sobre `{ "data": ..., "error": null }` — ese sobre está **DESACTUALIZADO, no se implementa; ignorarlo**. El backend real no lo usa (usa ProblemDetails para errores).
+- **Nombres consistentes**: usar `totalRows` (no `rowCount`) para conteos de filas, alineado con `import_jobs` y los estados de job.
 
 **Patrón de endpoint** (ejemplo):
 
@@ -1007,38 +1009,41 @@ Authorization: Bearer <jwt>
 1. Valida `fileNumber` (23 dígitos).
 2. Verifica que NO haya `import_jobs` activo del usuario → si lo hay, **409 Conflict** con `error.code = 'IMPORT_IN_PROGRESS'`.
 3. Verifica unicidad por `(user_id, file_number)` → si existe, **409 Conflict** con `error.code = 'DUPLICATE_PROCESS'`.
-4. **Llama síncronamente a los 4 endpoints de la API Rama Judicial** (con Polly):
-   - `GetOverviewByFileNumberAsync` → si retorna null → **422 Unprocessable** ("Proceso no encontrado en Rama Judicial").
-   - `GetDetailAsync(externalProcessId)`.
-   - `GetSubjectsAsync(externalProcessId)`.
-   - `GetFirstPageActionsAsync(externalProcessId)`.
-5. **Persiste todo en una sola transacción**: `processes` + `process_subjects` + `process_actions`.
-6. Setea `attended = true` (es creación, no novedad pendiente).
-7. Devuelve **201 Created** con el proceso completo (incluye sujetos y actuaciones).
+4. **Llama al overview** (con Polly): `GetOverviewByFileNumberAsync` → si retorna null / 200 vacío → **422 Unprocessable** ("Proceso no encontrado en Rama Judicial").
+   - **⚠️ Si `esPrivado == true`** (proceso privado): NO llamar a los otros 3 endpoints (responden 404). Persistir SOLO overview, `is_private = true`, `last_court_action_at = null`, **sin filas en `process_subjects` ni `process_actions`**, `sync_status = 'ok'`, `sync_phase = 'idle'`, `attended = true` → **201 Created**. Ver callout "Manejo de procesos privados" abajo.
+5. **Si NO es privado, llama a los otros 3 endpoints** (con Polly): `GetDetailAsync`, `GetSubjectsAsync`, `GetFirstPageActionsAsync`.
+6. **Persiste en una sola transacción**: `processes` + `process_subjects` + `process_actions`. Defensa: **nunca** insertar un `process_subjects` con `subject_type` nulo/vacío — si el parseo de `sujetosProcesales` produce una entrada malformada, se descarta esa entrada (el `NOT NULL` se mantiene, es correcto).
+7. Setea `attended = true`. Devuelve **201 Created** con el proceso.
 
 **Fallback de robustez** — si algún call DESPUÉS del overview falla tras agotar reintentos de Polly:
 
 - Persistimos lo obtenido hasta ese punto.
 - Marcamos `sync_status = 'partial'` con `sync_error` describiendo qué faltó.
 - Encolamos `CompletePartialFetchJob(processId)` para reintentar en background.
-- Devolvemos **201 Created** con `data.syncStatus = 'partial'` para que el frontend muestre: "Proceso creado. Algunos datos se están terminando de cargar, recarga en unos minutos."
+- Devolvemos **201 Created** con `syncStatus = 'partial'` para que el frontend muestre: "Proceso creado. Algunos datos se están terminando de cargar, recarga en unos minutos."
 
-**Respuesta exitosa (201)**:
+**Manejo de procesos privados (`esPrivado: true`)** — caso confirmado en pruebas (ej. radicado `17873408900220240033000`):
+
+Algunos procesos son **privados**. El overview los devuelve con `esPrivado: true`, `sujetosProcesales: "--- [ PROCESO PRIVADO ] ---"` y `fechaUltimaActuacion: null`. Los otros 3 endpoints (detalle, sujetos, actuaciones) responden **404 `"No se puede ver el detalle de un proceso privado"`**. Este es un caso NORMAL, no un error.
+
+- **DTO**: el overview debe exponer `esPrivado` (bool). El `IRamaJudicialClient` **nunca** debe tratar el 404 de un proceso privado como error reintentable — es un resultado terminal conocido (si no, Hangfire reintenta 10 veces inútilmente).
+- **Backend** (creación individual y `BulkImportJob` comparten `ProcessCreationService`, así que se arregla en un solo lugar): si `esPrivado`, persistir solo overview, `is_private=true`, **sin subjects/actions**, `sync_status='ok'`, `sync_phase='idle'`. NUNCA parsear `sujetosProcesales` a `process_subjects` — el placeholder no es un sujeto y produce el `null value in column "subject_type"` que rompía el import.
+- **Sync engine**: `OverviewSweepJob` puede refrescar el overview de privados, pero **nunca** encola `ActionsSweepJob` para ellos (darían 404). Con `fechaUltimaActuacion` null y sin actuaciones, quedan `idle` permanentemente. (Si algún día `esPrivado` pasara a false, se trata como cambio normal.)
+- **UI**: mostrar un **tag "Privado"** en listados y en el detalle. En el detalle, en vez de sujetos/actuaciones, un mensaje: *"Proceso privado — la Rama Judicial no permite consultar sujetos ni actuaciones."* `canDownloadPdf = false` (igual que en 'partial'). El DTO de proceso incluye `isPrivate: true`.
+
+**Respuesta exitosa (201)** — sin envelope, el DTO directo:
 ```json
 {
-  "data": {
-    "id": "uuid",
-    "fileNumber": "17001400301020240019200",
-    "syncStatus": "ok",
-    "court": { "id": "...", "name": "JUZGADO 002 CIVIL..." },
-    "processType": "De Ejecución",
-    "currentStatus": "Fijacion estado",
-    "lastCourtActionAt": "2026-03-20T00:00:00Z",
-    "subjects": [...],
-    "actions": [...],
-    "createdAt": "2026-05-26T20:00:00Z"
-  },
-  "error": null
+  "id": "uuid",
+  "fileNumber": "17001400301020240019200",
+  "syncStatus": "ok",
+  "court": { "id": "...", "name": "JUZGADO 002 CIVIL..." },
+  "processType": "De Ejecución",
+  "currentStatus": "Fijacion estado",
+  "lastCourtActionAt": "2026-03-20T00:00:00Z",
+  "subjects": [...],
+  "actions": [...],
+  "createdAt": "2026-05-26T20:00:00Z"
 }
 ```
 
@@ -1060,26 +1065,25 @@ Internamente compone el radicado: `courts.official_code (12) + filingYear (4) + 
 
 #### GET `/api/v1/imports/active`
 
-Permite al frontend saber si el usuario tiene una importación en curso para bloquear la UI:
+Permite al frontend saber si el usuario tiene una importación en curso para bloquear la UI. **No** hay envelope `{ hasActive, importJob }` — el backend responde directamente con el job o con `204 No Content`:
 
 ```json
 {
-  "data": {
-    "hasActive": true,
-    "importJob": {
-      "id": "uuid",
-      "fileName": "portafolio.xlsx",
-      "totalRows": 87,
-      "processedRows": 34,
-      "status": "running",
-      "createdAt": "..."
-    }
-  },
-  "error": null
+  "id": "uuid",
+  "fileName": "portafolio.xlsx",
+  "totalRows": 87,
+  "processedRows": 34,
+  "successCount": 0,
+  "errorCount": 0,
+  "status": "running",
+  "createdAt": "...",
+  "completedAt": null,
+  "errors": null
 }
 ```
+> **Contrato canónico real** (`ImportJobResponse` en `ImportContracts.cs`): **200 OK con el job directamente**, o **204 No Content** (body vacío) cuando no hay job activo ni reciente. El frontend (`ImportsService.getActive()`) mapea 204 → `null`. `errors` viaja como **string JSON crudo** (`[{row, radicado, code, message}, ...]` serializado), no como array — hay que hacer `JSON.parse` antes de usarlo.
 
-Si `hasActive = true`, el frontend deshabilita el botón "Agregar Proceso" con tooltip: "Hay una importación en curso. Espera a que termine antes de agregar procesos manualmente."
+Si el body no es `null`, el frontend deshabilita el botón "Agregar Proceso" con tooltip: "Hay una importación en curso. Espera a que termine antes de agregar procesos manualmente."
 
 #### GET `/api/v1/processes/novelties`
 
@@ -1089,19 +1093,16 @@ GET /api/v1/processes/novelties?page=1&pageSize=20
 
 ```json
 {
-  "data": {
-    "items": [
-      {
-        "id": "uuid",
-        "fileNumber": "17001400301020240019200",
-        "currentStatus": "Fijacion estado",
-        "lastCourtActionAt": "2026-03-20T00:00:00Z",
-        "courtName": "JUZGADO 002 CIVIL MUNICIPAL DE EJECUCIÓN DE SENTENCIAS DE MANIZALES"
-      }
-    ],
-    "total": 5, "page": 1, "pageSize": 20, "totalPages": 1
-  },
-  "error": null
+  "items": [
+    {
+      "id": "uuid",
+      "fileNumber": "17001400301020240019200",
+      "currentStatus": "Fijacion estado",
+      "lastCourtActionAt": "2026-03-20T00:00:00Z",
+      "courtName": "JUZGADO 002 CIVIL MUNICIPAL DE EJECUCIÓN DE SENTENCIAS DE MANIZALES"
+    }
+  ],
+  "total": 5, "page": 1, "pageSize": 20, "totalPages": 1
 }
 ```
 
@@ -1122,37 +1123,34 @@ GET /api/v1/processes?page=1&pageSize=20
 
 ```json
 {
-  "data": {
-    "id": "...", "fileNumber": "...", "alias": "...",
-    "court": { "id": "...", "name": "...", "cityName": "Manizales", "departmentName": "Caldas" },
-    "filingYear": 2024,
-    "processType": "De Ejecución",
-    "processClass": "Ejecutivo Singular",
-    "judgeName": "...",
-    "currentStatus": "...",
-    "lastCourtActionAt": "...",
-    "attended": false,
-    "syncStatus": "ok",                   // "ok" | "partial" | "pending" | "error" | "not_found"
-    "syncPhase": "idle",                  // info adicional para debugging
-    "canDownloadPdf": true,               // false si syncStatus != 'ok'
-    "subjects": [
-      { "type": "Demandante", "name": "OSCAR ARTURO ORTIZ HENAO" },
-      { "type": "Demandado", "name": "FRANCISCA HELENA GONZALEZ ARIAS" }
-    ],
-    "actions": [
-      {
-        "id": "...",
-        "consecutiveNumber": 82,
-        "actionDate": "2026-03-20",
-        "action": "Fijacion estado",
-        "annotation": "...",
-        "termStartDate": "2026-03-24",
-        "termEndDate": "2026-03-24",
-        "groupedWithId": null
-      }
-    ]
-  },
-  "error": null
+  "id": "...", "fileNumber": "...", "alias": "...",
+  "court": { "id": "...", "name": "...", "cityName": "Manizales", "departmentName": "Caldas" },
+  "filingYear": 2024,
+  "processType": "De Ejecución",
+  "processClass": "Ejecutivo Singular",
+  "judgeName": "...",
+  "currentStatus": "...",
+  "lastCourtActionAt": "...",
+  "attended": false,
+  "syncStatus": "ok",                   // "ok" | "partial" | "pending" | "error" | "not_found"
+  "syncPhase": "idle",                  // info adicional para debugging
+  "canDownloadPdf": true,               // false si syncStatus != 'ok'
+  "subjects": [
+    { "type": "Demandante", "name": "OSCAR ARTURO ORTIZ HENAO" },
+    { "type": "Demandado", "name": "FRANCISCA HELENA GONZALEZ ARIAS" }
+  ],
+  "actions": [
+    {
+      "id": "...",
+      "consecutiveNumber": 82,
+      "actionDate": "2026-03-20",
+      "action": "Fijacion estado",
+      "annotation": "...",
+      "termStartDate": "2026-03-24",
+      "termEndDate": "2026-03-24",
+      "groupedWithId": null
+    }
+  ]
 }
 ```
 
@@ -1179,40 +1177,37 @@ file=@portafolio.xlsx
 
 ```json
 {
-  "data": {
-    "previewId": "tmp-uuid-cached-10min",
-    "columns": ["A: Radicado", "B: Juzgado", "C: Cliente", "D: Estado"],
-    "rowCount": 87,
-    "previewRows": [
-      { "A": "17001...", "B": "Juzgado 1 Civil...", "C": "...", "D": "..." }
-    ]
-  },
-  "error": null
+  "previewId": "tmp-uuid-cached-10min",
+  "columns": [
+    { "key": "A", "header": "DEPENDENCIA" },
+    { "key": "B", "header": "NUMERO DE PROCESO" },
+    { "key": "F", "header": "JUZGADO/CIUDAD" }
+  ],
+  "rows": [
+    { "A": "PROMISCUOS", "B": "17873408900120240056300", "F": "Juzgado 01 Promiscuo Municipal - Caldas - Villamaría" }
+  ],
+  "totalRows": 51
 }
 ```
 
 #### POST `/api/v1/imports`
 
+**Request** — contrato v1 radicado-first (canónico). El `mapping` SOLO tiene `radicadoCol` (obligatorio) y `notesCol` (opcional). Los campos de composición por partes (año/ciudad/juzgado/consecutivo) son **v2** y NO van en v1 (ver §9 estrategia de importación):
+
 ```json
 {
   "previewId": "tmp-uuid-cached-10min",
   "mapping": {
-    "fileNumberColumn": "A",
-    "filingYearColumn": null,
-    "cityColumn": "B",
-    "courtColumn": "B",
-    "consecutiveColumn": "A",
-    "demandantColumn": "C",
-    "demandadoColumn": "D",
-    "aliasColumn": null
+    "radicadoCol": "B",
+    "notesCol": "I"
   },
-  "fileNumberMode": "full" | "compose"   
-  // "full" = la columna trae los 23 dígitos
-  // "compose" = hay que construirlos a partir de otras columnas
+  "fileName": "portafolio.xlsx"
 }
 ```
 
-**Respuesta**: 202 Accepted con `{ importJobId }`. Frontend hace polling a GET `/imports/{id}`.
+Coincide con el backend: `ExecuteImportRequest(Guid PreviewId, ColumnMappingRequest Mapping, string? FileName)` y `ColumnMappingRequest(string RadicadoCol, string? NotesCol)`. NO existe `fileNumberMode` en v1 (toda fila sin radicado de 23 díg. → carga manual, no se compone).
+
+**Respuesta**: 202 Accepted con `{ "importJobId": "uuid", "status": "pending" }`. El frontend hace polling a **GET `/imports/active`** (no a `/imports/{id}`), según §9.
 
 ---
 
@@ -2398,7 +2393,7 @@ Crear `Directory.Build.props` con:
 - **Validación en el controller** ANTES de leer con ClosedXML:
   - `[RequestSizeLimit(2 * 1024 * 1024)]` en el endpoint multipart.
   - Si excede tamaño → 413 Payload Too Large.
-- **Validación tras parse**: si `rowCount > MaxRows` → 422 con `error.code='TOO_MANY_ROWS'`.
+- **Validación tras parse**: si `totalRows > MaxRows` → 422 con ProblemDetails (`code='TOO_MANY_ROWS'`).
 - Rationale: ClosedXML carga el DOM completo en memoria. 2MB + 5000 filas cubre el 99.99% de portafolios reales de un abogado individual.
 - **Si en producción real vemos OOMs**: migrar a `ExcelDataReader` (streaming, más eficiente, API menos amigable). Documentado pero NO se hace en MVP.
 
@@ -2412,11 +2407,10 @@ Crear `Directory.Build.props` con:
    - Crea `ImportJob` con `status='pending'`.
    - Encola `BulkImportJob(importJobId)` en cola `bulk_import`.
    - Devuelve 202 Accepted con `{ importJobId, status: 'pending' }`.
-5. **`GET /imports/active`** — endpoint **único** que el frontend usa para todo el ciclo del import:
-   - Devuelve el job activo del usuario (status `pending` o `running`) con campos: `{ id, fileName, totalRows, processedRows, successCount, errorCount, status, errors, createdAt, completedAt }`.
-   - Si el último job del usuario terminó hace **menos de 60 segundos**, también lo devuelve con `status='completed'` (ventana corta para que el frontend pueda detectar la finalización vía polling y disparar el popup + refresh).
-   - Después de esos 60 segundos: devuelve `null`.
-   - Devuelve `null` si nunca ha habido import o el último ya pasó la ventana de 60s.
+5. **`GET /imports/active`** — endpoint **único** que el frontend usa para todo el ciclo del import. Contrato canónico real (ver §5, `ImportJobResponse` en `ImportContracts.cs`): **200 OK con el job directamente, o 204 No Content** (sin body) — NO hay envelope `{ hasActive, importJob }`.
+   - Si hay job en curso (`pending`/`running`): 200 con `{ id, fileName, totalRows, processedRows, successCount, errorCount, status, createdAt, completedAt, errors }`, donde `errors` es un **string JSON crudo** (hay que parsearlo), no un array.
+   - Si el último job terminó hace **menos de 60 segundos**: también 200 con `status='completed'` (ventana corta para que el frontend detecte la finalización vía polling y dispare popup + refresh).
+   - Pasados esos 60s, o si nunca hubo import: **204 No Content** (body vacío → el frontend lo mapea a `null`).
 6. `GET /imports/{id}` — opcional, solo para consulta directa de un job específico (link desde email, historial). No se usa en el flujo principal.
 7. `BulkImportJob`:
    - `UPDATE import_jobs SET status='running'` al inicio.
@@ -2471,7 +2465,14 @@ Crear `Directory.Build.props` con:
    (notificación extra-app, sirve si cerró el navegador).
 ```
 
-**Implementación del banner** (Angular): servicio singleton `ImportProgressService` con un signal `activeImport = signal<ImportJobStatus | null>(null)`. Al cargar el dashboard se llama `/imports/active` una vez para hidratar el signal. Si hay job activo arranca el polling. El componente `<global-import-banner>` se renderiza condicionalmente en `dashboard.component.html` justo bajo el header.
+**Implementación del banner** (Angular): servicio singleton `ImportProgressService` con dos signals — `activeImport = signal<ImportJob | null>(null)` (banner + bloqueo de botón) y `completedJob = signal<ImportJob | null>(null)` (dispara el popup de resumen). `ImportsService.getActive()` traduce la respuesta cruda del backend (200 con el job directo, o 204 → `null`) a `ImportJob | null`, parseando `errors` (string JSON) a array.
+
+**Polling — reglas estrictas (NO ocioso):**
+- El polling a `GET /imports/active` **solo arranca cuando el usuario inicia un import** (tras `POST /imports` exitoso).
+- Se **auto-detiene** apenas la respuesta trae `status='completed'` o `'failed'`, o el body es `null` (204) — hacer `clearInterval`/completar el stream ahí mismo. Jamás un `setInterval` perpetuo atado solo a `ngOnDestroy`.
+- Ante error de red, el polling **tolera fallos transitorios** (el propio `BulkImportJob` compite por conexiones de la pool de Postgres mientras corre) y solo desiste tras varios fallos consecutivos seguidos (`MAX_CONSECUTIVE_ERRORS`), no ante uno solo — un único blip no debe matar el banner para siempre.
+- En estado idle (sin import en curso) el dashboard **NO llama** `/imports/active`. **Cero polling de fondo.** El caso "el usuario cerró la app durante el import" lo cubre el **email** de finalización, no un polling permanente.
+- La lógica de polling vive en el `ImportProgressService`, **no** en `dashboard.component` (que solo lee los signals). El componente `<app-import-banner>` se renderiza condicionalmente en `dashboard.component.html` (bajo el header) leyendo `activeImport()`.
 
 **Bloqueo en el backend (defensa en profundidad)**: aunque el frontend deshabilita el botón, los endpoints `POST /processes/full-number` y `/wizard` también validan que no haya import activo del usuario → devuelven 409 con `error.code='IMPORT_IN_PROGRESS'` si alguien intenta llamar la API directamente (curl, Postman, segunda pestaña abierta). Esto evita race conditions y mal uso.
 

@@ -54,6 +54,13 @@ public static class DependencyInjection
 
         services.AddScoped<IEmailSender, NoOpEmailSender>();
 
+        // Both roles: the api reads the current user from the HTTP context; the worker
+        // registers it so BulkImportJob can build the shared ProcessCreationService.
+        // (On the worker there is no HttpContext → UserId is null, but the bulk-import
+        // path passes userId explicitly and never reads the current user.)
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
+
         // JWT/Identity — api role only; the worker never issues/validates tokens.
         if (!isWorker)
         {
@@ -67,9 +74,7 @@ public static class DependencyInjection
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddHttpContextAccessor();
             services.AddScoped<IJwtTokenService, JwtTokenService>();
-            services.AddScoped<ICurrentUserService, CurrentUserService>();
             services.AddScoped<IIdentityService, IdentityService>();
             services.AddScoped<IAuthRepository, AuthRepository>();
 
@@ -175,6 +180,8 @@ public static class DependencyInjection
         services.AddScoped<IProcessReader, ProcessReader>();
         services.AddScoped<IPartialFetchScheduler, NoOpPartialFetchScheduler>();
         services.AddScoped<IProcessPdfGenerator, ProcessPdfGenerator>();
+        services.AddScoped<IImportJobRepository, ImportJobRepository>();
+        services.AddScoped<IOutboxRepository, OutboxRepository>();
 
         return services;
     }

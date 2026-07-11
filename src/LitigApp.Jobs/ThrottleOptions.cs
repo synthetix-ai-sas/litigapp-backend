@@ -21,4 +21,14 @@ public sealed class ThrottleOptions
 
     [Range(1, 60)]
     public int ActionsIntervalSecondsMax { get; init; } = 3;
+
+    /// <summary>
+    /// Delay applied between rows in BulkImportJob (blueprint §6.1 InitialFetchInterval).
+    /// Shorter than sweep intervals because the user is waiting synchronously.
+    /// </summary>
+    [Range(1, 30)]
+    public int InitialFetchIntervalSecondsMin { get; init; } = 1;
+
+    [Range(1, 30)]
+    public int InitialFetchIntervalSecondsMax { get; init; } = 2;
 }

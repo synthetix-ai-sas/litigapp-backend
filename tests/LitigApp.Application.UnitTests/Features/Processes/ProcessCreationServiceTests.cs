@@ -159,8 +159,61 @@ public class ProcessCreationServiceTests
         Assert.Equal(ProcessErrorCodes.InvalidFileNumber, result.Error);
     }
 
+    [Fact]
+    public async Task CreateAsync_PrivateProcess_PersistsOverviewOnly_NeverCallsDetailSubjectsActions()
+    {
+        _rama.GetOverviewByFileNumberAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(RamaResult<OverviewData?>.Ok(new OverviewData(
+                888, 7, "key", LastActionDate: null, "JUZGADO 002", "Caldas", IsPrivate: true)));
+
+        var result = await CreateSut().CreateAsync(ValidFileNumber, null, default);
+
+        Assert.True(result.IsSuccess);
+        await _repo.Received(1).AddAsync(
+            Arg.Is<Process>(p =>
+                p.IsPrivate &&
+                p.SyncStatus == "ok" &&
+                p.SyncPhase == "idle" &&
+                p.Attended &&
+                p.LastCourtActionAt == null &&
+                p.Subjects.Count == 0 &&
+                p.Actions.Count == 0),
+            Arg.Any<CancellationToken>());
+        await _repo.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+
+        // The other 3 endpoints all 404 for private processes — they must NEVER be called.
+        await _rama.DidNotReceive().GetDetailAsync(Arg.Any<long>(), Arg.Any<CancellationToken>());
+        await _rama.DidNotReceive().GetSubjectsAsync(Arg.Any<long>(), Arg.Any<CancellationToken>());
+        await _rama.DidNotReceive().GetFirstPageActionsAsync(Arg.Any<long>(), Arg.Any<CancellationToken>());
+        _scheduler.DidNotReceive().SchedulePartialCompletion(Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task CreateAsync_SubjectWithBlankOrNullType_IsDiscarded_NotPersisted()
+    {
+        StubOverviewOk();
+        StubDetailOk();
+        StubActionsOk();
+        _rama.GetSubjectsAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(RamaResult<List<SubjectData>>.Ok(new List<SubjectData>
+            {
+                new(1, "Demandante", false, "123", "OSCAR ORTIZ"),
+                new(2, "", false, "456", "TIPO VACIO"),      // blank subject_type → discard
+                new(3, null!, false, "789", "TIPO NULO"),    // null subject_type → discard
+            }));
+
+        var result = await CreateSut().CreateAsync(ValidFileNumber, null, default);
+
+        Assert.True(result.IsSuccess);
+        await _repo.Received(1).AddAsync(
+            Arg.Is<Process>(p =>
+                p.Subjects.Count == 1 &&
+                p.Subjects.All(s => !string.IsNullOrWhiteSpace(s.SubjectType))),
+            Arg.Any<CancellationToken>());
+    }
+
     private static ProcessDetailDto DummyDetail() => new(
         Guid.NewGuid(), ValidFileNumber, null, null, 2024, null, null, null, null, null,
-        false, "ok", "idle", true,
+        false, "ok", "idle", false, true,
         new List<ProcessSubjectDto>(), new List<ProcessActionDto>());
 }

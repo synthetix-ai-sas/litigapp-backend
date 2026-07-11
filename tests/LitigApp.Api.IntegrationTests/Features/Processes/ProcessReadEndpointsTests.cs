@@ -64,6 +64,9 @@ public sealed class ProcessReadEndpointsTests : IClassFixture<ApiFactory>
         var root = Root(await response.Content.ReadAsStringAsync());
         // p1, p2 (unattended) + p3 (attended) = 3; soft-deleted and other-user excluded
         root.GetProperty("total").GetInt32().Should().Be(3);
+        // List rows expose isPrivate so the UI can show the "Privado" tag without opening detail.
+        foreach (var item in root.GetProperty("items").EnumerateArray())
+            item.GetProperty("isPrivate").GetBoolean().Should().BeFalse();
     }
 
     [Fact]

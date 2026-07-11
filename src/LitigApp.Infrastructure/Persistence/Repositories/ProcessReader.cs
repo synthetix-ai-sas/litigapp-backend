@@ -95,7 +95,9 @@ internal sealed class ProcessReader(AppDbContext db) : IProcessReader
                 p.Attended,
                 p.SyncStatus,
                 p.SyncPhase,
-                p.SyncStatus == ProcessSyncStatus.Ok,
+                p.IsPrivate,
+                // Private processes have no subjects/actions to render, so no PDF (blueprint).
+                p.SyncStatus == ProcessSyncStatus.Ok && !p.IsPrivate,
                 p.Subjects
                     .Select(s => new ProcessSubjectDto(s.SubjectType, s.Name, s.Identification, s.IsSummoned))
                     .ToList(),
@@ -130,7 +132,8 @@ internal sealed class ProcessReader(AppDbContext db) : IProcessReader
                 p.CurrentStatus,
                 p.LastCourtActionAt,
                 p.Court != null ? p.Court.Name : null,
-                p.Attended))
+                p.Attended,
+                p.IsPrivate))
             .ToListAsync(ct);
 
         return new PagedResult<ProcessListItemDto>(items, total, page, pageSize);

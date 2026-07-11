@@ -7,4 +7,6 @@ public static class ImportErrorCodes
     public const string EmptyFile = "EMPTY_FILE";
     public const string InvalidFile = "INVALID_FILE";
     public const string TooManyRows = "TOO_MANY_ROWS";
+    public const string PreviewExpired = "PREVIEW_EXPIRED";
+    public const string ImportInProgress = "IMPORT_IN_PROGRESS";
 }

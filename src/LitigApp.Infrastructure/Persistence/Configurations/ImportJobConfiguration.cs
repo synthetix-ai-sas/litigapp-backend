@@ -26,7 +26,10 @@ public class ImportJobConfiguration : IEntityTypeConfiguration<ImportJob>
             .HasDefaultValue("pending");
 
         builder.Property(j => j.ColumnMapping).HasColumnType("jsonb");
+        builder.Property(j => j.PreviewPayload).HasColumnType("jsonb");
         builder.Property(j => j.Errors).HasColumnType("jsonb");
+        builder.Property(j => j.SyncError).HasColumnType("text");
+        builder.Property(j => j.PreviewId).HasColumnType("uuid");
         builder.Property(j => j.CreatedAt).HasColumnType("timestamptz");
         builder.Property(j => j.CompletedAt).HasColumnType("timestamptz");
 

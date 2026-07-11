@@ -37,6 +37,7 @@ public sealed record ProcessDetailDto(
     bool Attended,
     string SyncStatus,
     string SyncPhase,
+    bool IsPrivate,
     bool CanDownloadPdf,
     IReadOnlyList<ProcessSubjectDto> Subjects,
     IReadOnlyList<ProcessActionDto> Actions);
