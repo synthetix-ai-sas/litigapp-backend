@@ -18,5 +18,15 @@ public static class HangfireConfiguration
             methodCall: job => job.RunAsync(CancellationToken.None),
             cronExpression: overviewCron,
             options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+        // Hourly, NOT every 5 min (blueprint §11 Step 11) — recovers outbox rows a normal
+        // send left 'pending'/'processing'. Raw expression (not Hangfire's Cron helper,
+        // which is obsolete in this Hangfire version).
+        manager.AddOrUpdate<NotificationFallbackSweepJob>(
+            recurringJobId: "notification-fallback-sweep",
+            queue: "notifications",
+            methodCall: job => job.RunAsync(CancellationToken.None),
+            cronExpression: "0 * * * *",
+            options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
     }
 }

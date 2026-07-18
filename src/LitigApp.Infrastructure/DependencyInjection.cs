@@ -3,11 +3,13 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Application.Features.Imports;
+using LitigApp.Application.Features.Notifications;
 using LitigApp.Infrastructure.Catalog;
 using LitigApp.Infrastructure.Imports;
 using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Notifications.Email;
+using LitigApp.Infrastructure.Notifications.Templates;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Infrastructure.Pdf;
 using LitigApp.Infrastructure.Persistence.Repositories;
@@ -20,6 +22,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
+using Resend;
 
 namespace LitigApp.Infrastructure;
 
@@ -52,7 +55,7 @@ public static class DependencyInjection
                 .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention());
 
-        services.AddScoped<IEmailSender, NoOpEmailSender>();
+        // IEmailSender (Resend) is registered below, in the notifications section.
 
         // Both roles: the api reads the current user from the HTTP context; the worker
         // registers it so BulkImportJob can build the shared ProcessCreationService.
@@ -61,7 +64,24 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
 
-        // JWT/Identity — api role only; the worker never issues/validates tokens.
+        // Identity (UserManager/RoleManager) — BOTH roles: IIdentityService.GetUserProfileAsync
+        // is used by INotificationDispatchService, which runs on both roles (the "notifications"
+        // queue is drained by api AND worker, per blueprint §14). JWT issuance/validation and the
+        // auth command handlers below stay api-only — the worker never issues/validates tokens.
+        services.AddScoped<IIdentityService, IdentityService>();
+        services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+            {
+                options.Password.RequiredLength = 8;
+                options.Password.RequireDigit = true;
+                options.Password.RequireLowercase = true;
+                options.Password.RequireUppercase = false;
+                options.Password.RequireNonAlphanumeric = false;
+                options.User.RequireUniqueEmail = true;
+                options.SignIn.RequireConfirmedEmail = false; // set to true in production
+            })
+            .AddEntityFrameworkStores<AppDbContext>()
+            .AddDefaultTokenProviders();
+
         if (!isWorker)
         {
             services.AddOptions<JwtOptions>()
@@ -75,21 +95,7 @@ public static class DependencyInjection
                 .ValidateOnStart();
 
             services.AddScoped<IJwtTokenService, JwtTokenService>();
-            services.AddScoped<IIdentityService, IdentityService>();
             services.AddScoped<IAuthRepository, AuthRepository>();
-
-            services.AddIdentity<ApplicationUser, IdentityRole>(options =>
-                {
-                    options.Password.RequiredLength = 8;
-                    options.Password.RequireDigit = true;
-                    options.Password.RequireLowercase = true;
-                    options.Password.RequireUppercase = false;
-                    options.Password.RequireNonAlphanumeric = false;
-                    options.User.RequireUniqueEmail = true;
-                    options.SignIn.RequireConfirmedEmail = false; // set to true in production
-                })
-                .AddEntityFrameworkStores<AppDbContext>()
-                .AddDefaultTokenProviders();
         }
 
         // ── Time ──────────────────────────────────────────────────────────────
@@ -182,6 +188,45 @@ public static class DependencyInjection
         services.AddScoped<IProcessPdfGenerator, ProcessPdfGenerator>();
         services.AddScoped<IImportJobRepository, ImportJobRepository>();
         services.AddScoped<IOutboxRepository, OutboxRepository>();
+        services.AddScoped<INotificationLogRepository, NotificationLogRepository>();
+
+        // ── Email notifications (blueprint §10.4) ─────────────────────────────
+        // Singleton: stateless, and caches parsed Scriban templates across the app lifetime.
+        services.AddSingleton<IEmailTemplateRenderer, ScribanEmailTemplateRenderer>();
+
+        services.AddOptions<ResendSenderOptions>()
+            .BindConfiguration(ResendSenderOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<NotificationsOptions>()
+            .BindConfiguration(NotificationsOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        // RESEND_APITOKEN is read directly (not Resend:ApiKey) — the Resend package's own
+        // options type, configured exactly as the SDK expects, separate from our own
+        // ResendSenderOptions (FromAddress/FromName/DevRedirectTo) above.
+        services.Configure<ResendClientOptions>(o =>
+            o.ApiToken = Environment.GetEnvironmentVariable("RESEND_APITOKEN") ?? string.Empty);
+
+        services.AddHttpClient<ResendClient>()
+            .AddResilienceHandler("resend", builder =>
+            {
+                // Retry only transient failures; EmailSendAsync's idempotencyKey (set by
+                // NotificationDispatchService from the outbox row id) makes a retried POST
+                // safe — Resend itself dedupes repeated sends with the same key.
+                builder.AddRetry(new HttpRetryStrategyOptions
+                {
+                    MaxRetryAttempts = 3,
+                    BackoffType = DelayBackoffType.Exponential,
+                    Delay = TimeSpan.FromSeconds(1),
+                    UseJitter = true,
+                });
+                builder.AddTimeout(TimeSpan.FromSeconds(15));
+            });
+        services.AddTransient<IResend, ResendClient>();
+        services.AddScoped<IEmailSender, ResendEmailSender>();
 
         return services;
     }

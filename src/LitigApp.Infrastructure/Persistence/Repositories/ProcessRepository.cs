@@ -1,4 +1,5 @@
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Features.Notifications.Dtos;
 using LitigApp.Domain.Catalog;
 using LitigApp.Domain.Processes;
 using LitigApp.Infrastructure.Persistence;
@@ -8,6 +9,20 @@ namespace LitigApp.Infrastructure.Persistence.Repositories;
 
 internal sealed class ProcessRepository(AppDbContext db) : IProcessRepository
 {
+    public Task<List<ChangedProcessDto>> GetChangedSinceAsync(
+        string userId, DateTimeOffset since, CancellationToken ct) =>
+        db.Processes.AsNoTracking()
+            .Where(p => p.UserId == userId && p.IsActive &&
+                        p.LastCourtActionAt != null && p.LastCourtActionAt > since)
+            .OrderByDescending(p => p.LastCourtActionAt)
+            .Select(p => new ChangedProcessDto(
+                p.Id,
+                p.FileNumber,
+                p.LastCourtActionAt!.Value,
+                p.Actions.OrderByDescending(a => a.ConsecutiveNumber).Select(a => a.Action).FirstOrDefault(),
+                p.Actions.OrderByDescending(a => a.ConsecutiveNumber).Select(a => a.Annotation).FirstOrDefault()))
+            .ToListAsync(ct);
+
     public Task<List<Process>> GetEligibleForOverviewSweepAsync(
         int batchSize,
         TimeSpan minimumTimeBetweenSyncs,

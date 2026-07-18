@@ -24,6 +24,7 @@ using LitigApp.Application.Features.Processes.Commands.CreateFromWizard;
 using LitigApp.Application.Features.Processes.Commands.MarkAttended;
 using LitigApp.Application.Features.Processes.Commands.SoftDelete;
 using LitigApp.Application.Features.Processes.Services;
+using LitigApp.Application.Features.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LitigApp.Application;
@@ -36,6 +37,11 @@ public static class DependencyInjection
         // on the worker, so it must be registered for both roles.
         services.AddScoped<ProcessCreationService>();
         services.AddScoped<IProcessCreator>(sp => sp.GetRequiredService<ProcessCreationService>());
+
+        // Notifications dispatch: shared by DispatchUserNotificationsJob, DispatchImportCompleteJob,
+        // and NotificationFallbackSweepJob — all triggered from the "notifications" queue, which
+        // BOTH roles drain (blueprint §14), so this must be registered for both roles too.
+        services.AddScoped<INotificationDispatchService, NotificationDispatchService>();
 
         // Only the api role's HTTP endpoints call these; worker jobs hit Infrastructure directly.
         if (!isWorker)

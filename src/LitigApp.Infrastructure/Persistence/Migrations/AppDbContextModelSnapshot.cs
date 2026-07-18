@@ -315,6 +315,12 @@ namespace LitigApp.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamptz")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("DuplicateCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("duplicate_count");
+
                     b.Property<int>("ErrorCount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")

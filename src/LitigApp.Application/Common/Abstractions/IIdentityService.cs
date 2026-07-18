@@ -8,9 +8,13 @@ public interface IIdentityService
     Task<string?> ValidateCredentialsAsync(string email, string password, CancellationToken ct = default);
     Task<IReadOnlyList<string>> GetUserRolesAsync(string userId, CancellationToken ct = default);
     Task<string?> GetUserEmailAsync(string userId, CancellationToken ct = default);
+    Task<UserProfile?> GetUserProfileAsync(string userId, CancellationToken ct = default);
     Task<string?> GetPasswordResetTokenAsync(string email, CancellationToken ct = default);
     Task<IdentityOperationResult> ResetPasswordAsync(
         string email, string resetToken, string newPassword, CancellationToken ct = default);
 }
 
 public record IdentityOperationResult(bool Succeeded, string? UserId, string? Error);
+
+/// <summary>Minimal profile needed to address an email (notifications).</summary>
+public record UserProfile(string Email, string FullName);

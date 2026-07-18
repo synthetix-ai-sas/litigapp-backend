@@ -56,4 +56,25 @@ public class WorkerCompositionTests
 
         services.Should().Contain(d => d.ServiceType == serviceType);
     }
+
+    /// <summary>
+    /// Contains-a-descriptor checks (above) don't catch "registered, but one of its OWN
+    /// dependencies is missing in this role" — that only surfaces when the full graph is
+    /// actually resolved, exactly like ASP.NET Core's own host startup validation does.
+    /// This is what would have caught IIdentityService being api-only while
+    /// INotificationDispatchService (worker + api) depends on it.
+    /// </summary>
+    [Fact]
+    public void WorkerRole_ServiceProviderBuildsSuccessfully_EveryRegisteredServiceResolves()
+    {
+        var services = BuildWorkerServices();
+
+        var act = () => services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true,
+        });
+
+        act.Should().NotThrow();
+    }
 }

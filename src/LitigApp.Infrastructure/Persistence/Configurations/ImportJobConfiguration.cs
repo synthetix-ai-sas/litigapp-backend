@@ -19,6 +19,7 @@ public class ImportJobConfiguration : IEntityTypeConfiguration<ImportJob>
         builder.Property(j => j.ProcessedRows).HasColumnType("integer").HasDefaultValue(0);
         builder.Property(j => j.SuccessCount).HasColumnType("integer").HasDefaultValue(0);
         builder.Property(j => j.ErrorCount).HasColumnType("integer").HasDefaultValue(0);
+        builder.Property(j => j.DuplicateCount).HasColumnType("integer").HasDefaultValue(0);
 
         builder.Property(j => j.Status)
             .IsRequired()

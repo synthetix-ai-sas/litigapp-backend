@@ -49,6 +49,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             // Never hit the real WAF-protected Rama Judicial API from tests.
             services.RemoveAll<IRamaJudicialClient>();
             services.AddScoped<IRamaJudicialClient, FakeRamaJudicialClient>();
+
+            // Never hit Resend from tests.
+            services.RemoveAll<IEmailSender>();
+            services.AddScoped<IEmailSender, FakeEmailSender>();
         });
     }
 

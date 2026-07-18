@@ -1,3 +1,4 @@
+using LitigApp.Application.Features.Notifications.Dtos;
 using LitigApp.Domain.Catalog;
 using LitigApp.Domain.Processes;
 
@@ -5,6 +6,14 @@ namespace LitigApp.Application.Common.Abstractions;
 
 public interface IProcessRepository
 {
+    /// <summary>
+    /// Active processes for the user whose court action changed after <paramref name="since"/>
+    /// (digest source, blueprint §10.3), most-recent action first. Each row carries its
+    /// single latest <see cref="Domain.Processes.ProcessAction"/> (Action/Annotation) so the
+    /// digest email shows accion+anotacion consistently from the same action row.
+    /// </summary>
+    Task<List<ChangedProcessDto>> GetChangedSinceAsync(string userId, DateTimeOffset since, CancellationToken ct);
+
     Task<List<Process>> GetEligibleForOverviewSweepAsync(
         int batchSize,
         TimeSpan minimumTimeBetweenSyncs,

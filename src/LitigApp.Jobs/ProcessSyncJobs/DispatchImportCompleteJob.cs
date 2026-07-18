@@ -5,28 +5,28 @@ using Microsoft.Extensions.Logging;
 namespace LitigApp.Jobs.ProcessSyncJobs;
 
 /// <summary>
-/// Stub — triggered by BulkImportJob after completion.
-/// Full email dispatch (Resend + template) is implemented in 4.C'' (Step 11).
-/// The outbox row is already written by BulkImportJob; this job picks it up when ready.
+/// Triggered by BulkImportJob after it inserts the ImportComplete outbox row. The row's
+/// payload already carries everything needed (fileName, counts) — this job just loads it
+/// and hands it to <see cref="INotificationDispatchService"/>.
 /// </summary>
 [Queue("notifications")]
 public sealed class DispatchImportCompleteJob(
-    IImportJobRepository importRepo,
+    IOutboxRepository outboxRepo,
+    INotificationDispatchService dispatchService,
     ILogger<DispatchImportCompleteJob> logger)
 {
-    public async Task RunAsync(Guid importJobId, CancellationToken ct = default)
+    public async Task RunAsync(Guid outboxId, CancellationToken ct = default)
     {
-        var job = await importRepo.GetByIdAsync(importJobId, ct);
-        if (job is null)
+        var message = await outboxRepo.GetByIdAsync(outboxId, ct);
+        if (message is null)
         {
-            logger.LogWarning("DispatchImportCompleteJob: importJobId={Id} not found.", importJobId);
+            logger.LogWarning("DispatchImportCompleteJob: outboxId={Id} not found.", outboxId);
             return;
         }
 
-        // 4.C'': send ImportComplete email via Resend using the outbox row.
+        await dispatchService.DispatchAsync(message, ct);
+
         logger.LogInformation(
-            "DispatchImportCompleteJob stub: importJobId={Id} success={S} errors={E}. " +
-            "Email dispatch will be implemented in Step 11 (4.C'').",
-            importJobId, job.SuccessCount, job.ErrorCount);
+            "DispatchImportCompleteJob: outboxId={Id} dispatched. Status={Status}.", outboxId, message.Status);
     }
 }

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Hangfire;
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Application.Features.Imports;
+using LitigApp.Application.Features.Notifications.Dtos;
 using LitigApp.Domain.Imports;
 using LitigApp.Domain.Notifications;
 using Microsoft.Extensions.Logging;
@@ -112,7 +113,9 @@ public sealed class BulkImportJob(
             }
             else if (result.Error == "DUPLICATE_PROCESS")
             {
-                // Already in their portfolio — skip silently (not a user error).
+                // Already in their portfolio — skip silently (not a user error), but still
+                // tracked so the ImportComplete email can report "N duplicados".
+                job.DuplicateCount++;
                 logger.LogInformation(
                     "BulkImportJob {Id}: row {Row} radicado {Radicado} already exists, skipping.",
                     importJobId, i + 2, normalized);
@@ -148,8 +151,11 @@ public sealed class BulkImportJob(
         job.Errors = errors.Count > 0 ? JsonSerializer.Serialize(errors) : null;
         await importRepo.SaveChangesAsync(ct);
 
-        // Insert outbox event for ImportComplete email (blueprint §9 step 7).
-        await InsertImportCompleteOutboxAsync(job, now, ct);
+        // Insert outbox event for ImportComplete email (blueprint §9 step 7) and trigger
+        // its dispatch — pass the OUTBOX row id, not the import job id: the payload already
+        // carries everything DispatchImportCompleteJob needs to render/send.
+        var outboxId = await InsertImportCompleteOutboxAsync(job, now, ct);
+        scheduler.EnqueueImportComplete(outboxId);
 
         logger.LogInformation(
             "BulkImportJob {Id} completed: success={S} errors={E}.",
@@ -172,22 +178,22 @@ public sealed class BulkImportJob(
         logger.LogError("BulkImportJob {Id} failed: {Reason}.", job.Id, reason);
     }
 
-    private async Task InsertImportCompleteOutboxAsync(
+    private async Task<Guid> InsertImportCompleteOutboxAsync(
         ImportJob job, DateTimeOffset now, CancellationToken ct)
     {
-        var payload = JsonSerializer.Serialize(new
-        {
-            importJobId = job.Id,
-            fileName = job.FileName,
-            totalRows = job.TotalRows,
-            successCount = job.SuccessCount,
-            errorCount = job.ErrorCount,
-            completedAt = now,
-        });
+        var payload = JsonSerializer.Serialize(new ImportCompleteOutboxPayload(
+            ImportJobId: job.Id,
+            FileName: job.FileName,
+            TotalRows: job.TotalRows,
+            SuccessCount: job.SuccessCount,
+            DuplicateCount: job.DuplicateCount,
+            ErrorCount: job.ErrorCount,
+            CompletedAt: now));
 
+        var outboxId = Guid.NewGuid();
         await outboxRepo.InsertAsync(new OutboxMessage
         {
-            Id = Guid.NewGuid(),
+            Id = outboxId,
             UserId = job.UserId,
             EventType = "ImportComplete",
             Channel = "email",
@@ -195,6 +201,8 @@ public sealed class BulkImportJob(
             Status = "pending",
             CreatedAt = now,
         }, ct);
+
+        return outboxId;
     }
 
     private static TimeSpan PaceDelay(ThrottleOptions opts)

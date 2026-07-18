@@ -28,7 +28,7 @@ public class RequestPasswordResetCommandHandlerTests
 
         Assert.True(result.IsSuccess);
         await _emailSender.DidNotReceive().SendAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public class RequestPasswordResetCommandHandlerTests
     {
         _identityService.GetPasswordResetTokenAsync("user@example.com", Arg.Any<CancellationToken>())
             .Returns("reset-token-abc");
-        _emailSender.SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _emailSender.SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(Domain.Common.Result<string>.Success("ok"));
 
         var result = await _sut.HandleAsync(new RequestPasswordResetCommand("user@example.com"));
@@ -46,6 +46,7 @@ public class RequestPasswordResetCommandHandlerTests
             "user@example.com",
             Arg.Any<string>(),
             Arg.Is<string>(body => body.Contains("reset-token-abc")),
+            Arg.Any<string?>(),
             Arg.Any<CancellationToken>());
     }
 

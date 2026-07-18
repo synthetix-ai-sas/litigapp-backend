@@ -5,6 +5,8 @@
 #   ConnectionStrings__Postgres   — Supabase connection string
 #   Jwt__Secret                   — min 32 chars, generate with: openssl rand -hex 32
 #   Hangfire__DashboardPassword   — password for /hangfire Basic Auth prompt
+#   RESEND_APITOKEN               — Resend API key (read via raw env var, NOT Resend__ApiKey —
+#                                   also set on the worker service, it drains "notifications" too)
 
 [build]
 dockerfilePath = "Dockerfile.api"

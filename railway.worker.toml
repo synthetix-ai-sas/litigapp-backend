@@ -3,6 +3,8 @@
 #
 # Secrets that must be set in the Railway dashboard (never here):
 #   ConnectionStrings__Postgres   — same Supabase string as the api service
+#   RESEND_APITOKEN               — same Resend API key as the api service (this role also
+#                                   drains the "notifications" queue and can dispatch emails)
 
 [build]
 dockerfilePath = "Dockerfile.worker"

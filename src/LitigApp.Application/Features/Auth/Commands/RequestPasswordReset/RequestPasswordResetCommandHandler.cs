@@ -24,7 +24,7 @@ public sealed class RequestPasswordResetCommandHandler : ICommandHandler<Request
                 command.Email,
                 "Restablecer contraseña — LitigApp",
                 $"<p>Tu token de restablecimiento de contraseña es: <strong>{resetToken}</strong></p>",
-                ct);
+                ct: ct);
         }
 
         // Always return success to avoid leaking whether the email is registered
