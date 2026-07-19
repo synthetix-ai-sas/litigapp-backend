@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Hangfire;
 using LitigApp.Api.Auth;
 using LitigApp.Api.Cors;
@@ -110,6 +111,21 @@ try
 
         builder.Services.AddAuthorizationPolicies();
 
+        builder.Services.AddRateLimiter(options =>
+        {
+            // 5 requests per minute per IP on the password-reset request endpoint — abuse protection.
+            options.AddPolicy("password-reset", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        });
+
         builder.Services.AddOpenApi(options =>
         {
             options.AddDocumentTransformer((document, _, _) =>
@@ -152,6 +168,7 @@ try
         app.UseCors();
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseRateLimiter();
 
         app.UseHangfireDashboard("/hangfire", new DashboardOptions
         {

@@ -70,28 +70,26 @@ public sealed class IdentityService : IIdentityService
         return user?.Email is null ? null : new UserProfile(user.Email, user.FullName);
     }
 
-    public async Task<string?> GetPasswordResetTokenAsync(string email, CancellationToken ct = default)
+    public async Task<PasswordResetData?> GeneratePasswordResetAsync(string email, CancellationToken ct = default)
     {
         var user = await _userManager.FindByEmailAsync(email);
         if (user is null)
             return null;
 
-        return await _userManager.GeneratePasswordResetTokenAsync(user);
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        return new PasswordResetData(user.Id, user.FullName, token);
     }
 
-    public async Task<IdentityOperationResult> ResetPasswordAsync(
-        string email, string resetToken, string newPassword, CancellationToken ct = default)
+    public async Task<IdentityOperationResult> ResetPasswordByUserIdAsync(
+        string userId, string token, string newPassword, CancellationToken ct = default)
     {
-        var user = await _userManager.FindByEmailAsync(email);
+        var user = await _userManager.FindByIdAsync(userId);
         if (user is null)
-            return new IdentityOperationResult(false, null, "User not found.");
+            return new IdentityOperationResult(false, null, "INVALID_TOKEN");
 
-        var result = await _userManager.ResetPasswordAsync(user, resetToken, newPassword);
+        var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
         if (!result.Succeeded)
-        {
-            var error = string.Join("; ", result.Errors.Select(e => e.Description));
-            return new IdentityOperationResult(false, null, error);
-        }
+            return new IdentityOperationResult(false, null, "INVALID_TOKEN");
 
         return new IdentityOperationResult(true, user.Id, null);
     }

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using LitigApp.Api.Auth;
+using LitigApp.Api.Filters;
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Application.Features.Auth;
 using LitigApp.Application.Features.Auth.Commands.Login;
@@ -22,6 +23,8 @@ public record RegisterRequest(
     string? WhatsAppPhone,
     bool AcceptedTerms,
     bool AcceptedPrivacy);
+
+public record PasswordResetRequestedResponse(string Message);
 
 public static class AuthEndpoints
 {
@@ -63,14 +66,18 @@ public static class AuthEndpoints
         group.MapPost("/password-reset/request", RequestPasswordResetAsync)
             .WithName("RequestPasswordReset")
             .WithSummary("Request a password reset email")
-            .Produces(StatusCodes.Status204NoContent)
+            .Produces<PasswordResetRequestedResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .RequireRateLimiting("password-reset")
             .AllowAnonymous();
 
         group.MapPost("/password-reset/confirm", ConfirmPasswordResetAsync)
             .WithName("ConfirmPasswordReset")
             .WithSummary("Reset password using the token received by email")
             .Produces(StatusCodes.Status204NoContent)
+            .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status400BadRequest)
+            .AddEndpointFilter<ValidationFilter<ResetPasswordCommand>>()
             .AllowAnonymous();
 
         return app;
@@ -156,7 +163,9 @@ public static class AuthEndpoints
         CancellationToken ct)
     {
         await handler.HandleAsync(command, ct);
-        return TypedResults.NoContent();
+        // Always 200 with a neutral message — never reveal whether the email exists.
+        return TypedResults.Ok(new PasswordResetRequestedResponse(
+            "Si el correo está registrado, recibirás las instrucciones para restablecer tu contraseña."));
     }
 
     private static async Task<IResult> ConfirmPasswordResetAsync(
@@ -169,9 +178,10 @@ public static class AuthEndpoints
         return result.IsSuccess
             ? TypedResults.NoContent()
             : TypedResults.Problem(
-                detail: result.Error,
+                detail: "El enlace de restablecimiento es inválido o ha expirado.",
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Password reset failed.");
+                title: "Restablecimiento de contraseña fallido.",
+                extensions: new Dictionary<string, object?> { ["code"] = "INVALID_TOKEN" });
     }
 
     private static string? GetClientIp(HttpContext ctx)

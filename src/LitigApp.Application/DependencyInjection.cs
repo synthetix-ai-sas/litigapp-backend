@@ -1,3 +1,4 @@
+using FluentValidation;
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Application.Common.Behaviors;
 using LitigApp.Application.Features.Auth;
@@ -52,6 +53,10 @@ public static class DependencyInjection
             services.AddScoped<ICommandHandler<RefreshTokenCommand, AuthTokensResponse>, RefreshTokenCommandHandler>();
             services.AddScoped<ICommandHandler<RequestPasswordResetCommand, Unit>, RequestPasswordResetCommandHandler>();
             services.AddScoped<ICommandHandler<ResetPasswordCommand, Unit>, ResetPasswordCommandHandler>();
+
+            // Validators (used by endpoint filters)
+            services.AddScoped<IValidator<RequestPasswordResetCommand>, RequestPasswordResetCommandValidator>();
+            services.AddScoped<IValidator<ResetPasswordCommand>, ResetPasswordCommandValidator>();
 
             // Catalog query handlers
             services.AddScoped<IQueryHandler<ListDepartmentsQuery, List<DepartmentDto>>, ListDepartmentsHandler>();

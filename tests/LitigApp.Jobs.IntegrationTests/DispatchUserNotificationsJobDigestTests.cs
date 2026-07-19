@@ -188,11 +188,11 @@ public sealed class DispatchUserNotificationsJobDigestTests : IAsyncLifetime
         public Task<string?> GetUserEmailAsync(string userId, CancellationToken ct = default) =>
             throw new NotImplementedException();
 
-        public Task<string?> GetPasswordResetTokenAsync(string email, CancellationToken ct = default) =>
+        public Task<PasswordResetData?> GeneratePasswordResetAsync(string email, CancellationToken ct = default) =>
             throw new NotImplementedException();
 
-        public Task<IdentityOperationResult> ResetPasswordAsync(
-            string email, string resetToken, string newPassword, CancellationToken ct = default) =>
+        public Task<IdentityOperationResult> ResetPasswordByUserIdAsync(
+            string userId, string token, string newPassword, CancellationToken ct = default) =>
             throw new NotImplementedException();
     }
 }

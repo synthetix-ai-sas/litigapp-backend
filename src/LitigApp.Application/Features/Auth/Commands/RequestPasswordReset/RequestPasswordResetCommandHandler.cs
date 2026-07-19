@@ -1,33 +1,47 @@
+using System.Net;
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Domain.Common;
+using Microsoft.Extensions.Options;
 
 namespace LitigApp.Application.Features.Auth.Commands.RequestPasswordReset;
 
-public sealed class RequestPasswordResetCommandHandler : ICommandHandler<RequestPasswordResetCommand, Unit>
+public sealed class RequestPasswordResetCommandHandler(
+    IIdentityService identityService,
+    IEmailSender emailSender,
+    IEmailTemplateRenderer templateRenderer,
+    IDateTimeProvider dateTimeProvider,
+    IOptions<AuthOptions> authOptions) : ICommandHandler<RequestPasswordResetCommand, Unit>
 {
-    private readonly IIdentityService _identityService;
-    private readonly IEmailSender _emailSender;
-
-    public RequestPasswordResetCommandHandler(IIdentityService identityService, IEmailSender emailSender)
-    {
-        _identityService = identityService;
-        _emailSender = emailSender;
-    }
+    private const int TokenLifespanMinutes = 60;
 
     public async Task<Result<Unit>> HandleAsync(RequestPasswordResetCommand command, CancellationToken ct = default)
     {
-        var resetToken = await _identityService.GetPasswordResetTokenAsync(command.Email, ct);
+        var resetData = await identityService.GeneratePasswordResetAsync(command.Email, ct);
 
-        if (resetToken is not null)
+        if (resetData is not null)
         {
-            await _emailSender.SendAsync(
+            var frontendBase = authOptions.Value.FrontendBaseUrl.TrimEnd('/');
+            var encodedToken = WebUtility.UrlEncode(resetData.Token);
+            var resetUrl = $"{frontendBase}/reset-password?token={encodedToken}&uid={resetData.UserId}";
+
+            var model = new Dictionary<string, object?>
+            {
+                ["AbogadoNombre"] = WebUtility.HtmlEncode(resetData.FullName),
+                ["UrlRestablecimiento"] = resetUrl,
+                ["MinutosExpiracion"] = TokenLifespanMinutes,
+                ["Año"] = dateTimeProvider.UtcNow.Year,
+            };
+
+            var htmlBody = templateRenderer.Render(EmailTemplate.PasswordReset, model);
+
+            await emailSender.SendAsync(
                 command.Email,
                 "Restablecer contraseña — LitigApp",
-                $"<p>Tu token de restablecimiento de contraseña es: <strong>{resetToken}</strong></p>",
+                htmlBody,
                 ct: ct);
         }
 
-        // Always return success to avoid leaking whether the email is registered
+        // Always return success — never leak whether the email is registered.
         return Result<Unit>.Success(Unit.Value);
     }
 }
