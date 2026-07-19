@@ -13,6 +13,9 @@ public class ImportJob
     public int SuccessCount { get; set; }
     public int ErrorCount { get; set; }
 
+    /// <summary>Rows silently skipped as already-in-portfolio (not success, not error).</summary>
+    public int DuplicateCount { get; set; }
+
     /// <summary>'pending' | 'running' | 'paused' | 'completed' | 'failed'</summary>
     public string Status { get; set; } = "pending";
 

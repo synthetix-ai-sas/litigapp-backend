@@ -64,6 +64,7 @@ public static class DependencyInjection
         services.AddScoped<DispatchUserNotificationsJob>();
         services.AddScoped<BulkImportJob>();
         services.AddScoped<DispatchImportCompleteJob>();
+        services.AddScoped<NotificationFallbackSweepJob>();
         services.AddScoped<CompletePartialFetchJob>();
 
         if (isWorker)

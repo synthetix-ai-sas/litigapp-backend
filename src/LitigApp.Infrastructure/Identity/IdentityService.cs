@@ -64,6 +64,12 @@ public sealed class IdentityService : IIdentityService
         return user?.Email;
     }
 
+    public async Task<UserProfile?> GetUserProfileAsync(string userId, CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        return user?.Email is null ? null : new UserProfile(user.Email, user.FullName);
+    }
+
     public async Task<string?> GetPasswordResetTokenAsync(string email, CancellationToken ct = default)
     {
         var user = await _userManager.FindByEmailAsync(email);

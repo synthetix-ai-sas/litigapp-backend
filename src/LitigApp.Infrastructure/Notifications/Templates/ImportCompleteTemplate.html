@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Importación exitosa — LitigApp</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#1d4ed8;border-radius:12px 12px 0 0;padding:28px 40px;text-align:center;">
+              <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto;">
+              <tr>
+                <td style="vertical-align:middle;padding-right:10px;">
+                  <span style="display:inline-block;background-color:#ffffff;color:#1d4ed8;font-size:15px;font-weight:900;width:32px;height:32px;line-height:32px;text-align:center;border-radius:6px;letter-spacing:-0.5px;">L</span>
+                </td>
+                <td style="vertical-align:middle;">
+                  <span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">LitigApp</span>
+                </td>
+              </tr>
+            </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background-color:#ffffff;padding:40px 40px 32px;">
+
+              <!-- Check icon -->
+              <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px;">
+                <tr>
+                  <td style="background-color:#f0fdf4;border-radius:50%;width:52px;height:52px;text-align:center;vertical-align:middle;font-size:24px;line-height:52px;">
+                    &#x2705;
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#16a34a;letter-spacing:0.5px;text-transform:uppercase;">Importación completada</p>
+              <h1 style="margin:0 0 16px;font-size:24px;font-weight:700;color:#0f172a;line-height:1.3;">
+                Tu archivo Excel fue cargado exitosamente
+              </h1>
+              <p style="margin:0 0 28px;font-size:15px;color:#475569;line-height:1.6;">
+                Hola <strong style="color:#0f172a;">{{AbogadoNombre}}</strong>, el archivo <strong style="color:#0f172a;">{{NombreArchivo}}</strong> fue procesado correctamente. Ya puedes ver tus procesos en el dashboard.
+              </p>
+
+              <!-- Stats row -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+                <tr>
+                  <!-- Importados -->
+                  <td width="33%" style="padding:20px 16px;text-align:center;border-right:1px solid #e2e8f0;">
+                    <p style="margin:0 0 4px;font-size:28px;font-weight:700;color:#1d4ed8;">{{TotalImportados}}</p>
+                    <p style="margin:0;font-size:12px;color:#64748b;font-weight:500;">Importados</p>
+                  </td>
+                  <!-- Duplicados -->
+                  <td width="33%" style="padding:20px 16px;text-align:center;border-right:1px solid #e2e8f0;">
+                    <p style="margin:0 0 4px;font-size:28px;font-weight:700;color:#f59e0b;">{{TotalDuplicados}}</p>
+                    <p style="margin:0;font-size:12px;color:#64748b;font-weight:500;">Duplicados</p>
+                  </td>
+                  <!-- Errores -->
+                  <td width="34%" style="padding:20px 16px;text-align:center;">
+                    <p style="margin:0 0 4px;font-size:28px;font-weight:700;color:#ef4444;">{{TotalErrores}}</p>
+                    <p style="margin:0;font-size:12px;color:#64748b;font-weight:500;">Con error</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Error warning (conditional) -->
+              {{ if TieneErrores }}
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;">
+                <tr>
+                  <td style="background-color:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:14px 16px;">
+                    <table cellpadding="0" cellspacing="0" role="presentation">
+                      <tr>
+                        <td style="padding-right:10px;vertical-align:top;font-size:16px;line-height:1;">
+                          &#x26A0;&#xFE0F;
+                        </td>
+                        <td>
+                          <p style="margin:0;font-size:13px;color:#9a3412;line-height:1.5;">
+                            Algunos radicados no pudieron importarse. Ingresa al dashboard para ver el detalle y corregirlos manualmente.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              {{ end }}
+
+              <!-- CTA -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td align="center">
+                    <a href="{{UrlDashboard}}"
+                       style="display:inline-block;background-color:#1d4ed8;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;padding:14px 32px;letter-spacing:0.2px;">
+                      Ver mis procesos
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="background-color:#ffffff;padding:0 40px;">
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:0;" />
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#ffffff;border-radius:0 0 12px 12px;padding:24px 40px 32px;">
+              <p style="margin:0 0 8px;font-size:13px;color:#94a3b8;line-height:1.6;">
+                Recibiste este correo porque iniciaste una importación masiva en LitigApp. Si no reconoces esta acción, por favor contáctanos.
+              </p>
+              <p style="margin:0;font-size:12px;color:#cbd5e1;">
+                &copy; {{Año}} LitigApp &middot; Colombia
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

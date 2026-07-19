@@ -26,7 +26,15 @@
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="QuestPDF" />
+    <PackageReference Include="Resend" />
+    <PackageReference Include="Scriban" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Loaded via Assembly.GetManifestResourceStream by ScribanEmailTemplateRenderer —
+         robust in Docker/Railway (no dependency on the file existing on disk at runtime). -->
+    <EmbeddedResource Include="Notifications\Templates\*.html" />
   </ItemGroup>
 
 </Project>

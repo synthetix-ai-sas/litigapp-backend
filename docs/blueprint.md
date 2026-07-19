@@ -1565,6 +1565,21 @@ export const routes: Routes = [
 - **Cacheo**: signals dentro del servicio + `tap()` para guardar la última respuesta.
 - **Mutaciones optimistas**: en "Marcar como atendido", actualizar signal local antes de la respuesta, rollback si falla.
 
+### 7.2.1 Estrategia de refresco / polling (anti-agresivo)
+
+**Regla general: NADA de polling de fondo a intervalos cortos.** Los datos del backend cambian a lo sumo cada ~15 min (cadencia del `OverviewSweepJob`); pollear cada pocos segundos es puro desperdicio y no escala (100 usuarios × 1 req/3s = ~33 req/s solo por la campanita).
+
+**Contador de novedades (campanita del header):**
+- Fuente de la verdad de "hay novedades": el **email** que dispara el sync. El contador in-app es una comodidad, no el mecanismo principal.
+- Refrescar el contador **por eventos, no por timer agresivo**:
+  1. Al **cargar el dashboard** (una vez).
+  2. Al **volver a la pestaña** (`visibilitychange` → `visible`) — cubre el caso "leí el email y vuelvo a la app".
+  3. Poll de respaldo **solo si la pestaña está visible**, cada **5 min (300s)** — alineado a que el sync corre cada 15 min. El refresco por foco (punto 2) es el mecanismo principal; este es solo una red de seguridad para quien deja el dashboard abierto. **Pausar** cuando la pestaña esté oculta. (Es válido incluso **omitirlo** y confiar solo en carga + foco + email.)
+- La campanita debe ser **accionable**: al hacer clic, navegar a la pestaña Novedades y **recargar la lista** (hoy solo muestra un número, es un callejón sin salida). Ver un número sin poder actuar no aporta.
+- Endpoint: reusar `GET /processes/novelties?page=1&pageSize=1` (el `total` da el conteo) o, opcional, un `GET /processes/novelties/count` liviano.
+
+Mismo principio para `GET /imports/active` (§9): polling solo durante un import activo, auto-detenido, cero en idle.
+
 ### 7.3 Composición de componentes (página Novedades)
 
 ```
@@ -2129,6 +2144,12 @@ Registrado vía Decorator en DI. Aplica a Commands automáticamente; los Queries
 
 ### 10.4 Templates de notificación (formato DIGEST — solo EMAIL en MVP)
 
+**Cliente y configuración:** el envío usa la **librería oficial `Resend` (.NET)** (`IResend`), NO HttpClient crudo. Plantillas **renderizadas en código** (HTML en el repo dentro del proyecto Infrastructure), NO plantillas hosteadas por ID. **Motor de plantillas: Scriban** (paquete NuGet, ligero, con loops nativos `{{ for }}` para la tabla del digest); NO Razor/.cshtml. Los `.html` se cargan como **Embedded Resources** del proyecto Infrastructure y el renderer HTML-escapa los valores dinámicos (nombres de partes, estados). Config:
+- `Resend:ApiKey` (env var `RESEND_APITOKEN`).
+- `Resend:FromAddress` = **`contac@notifications.synthetixaisas.com`** (dominio verificado).
+- `Resend:FromName` (ej. "LitigApp").
+- `Resend:DevRedirectTo` (env var, solo dev/staging): si está seteada, todos los emails van a esa dirección para probar sin spamear.
+
 **Email digest (Resend) — `UserDigestEmailTemplate.cs`**:
 
 ```
@@ -2143,10 +2164,11 @@ Detectamos cambios en {N} de tus procesos hoy:
 ├────────────────────────────────────────────────────────────────────┤
 │ 17001400301020240019200│ Fijacion estado     │ 2026-03-20  │ ...   │
 │ 66001233100020120021100│ Auto admite demanda │ 2026-03-19  │ ...   │
-│ ...                                                                 │
 └────────────────────────────────────────────────────────────────────┘
 
-[ Ver novedades en LitigApp ] → https://app.litigapp.co/novelties
+y {remaining} procesos más con novedades en tu portafolio.
+
+[ Ver todas mis novedades ] → https://app.litigapp.co/novelties
 
 Recibes este correo porque tienes activadas las notificaciones por email.
 Puedes ajustar tus preferencias en https://app.litigapp.co/settings
@@ -2154,7 +2176,7 @@ Puedes ajustar tus preferencias en https://app.litigapp.co/settings
 — Equipo LitigApp
 ```
 
-Renderizado con tabla HTML real (responsive). Si hay 1 solo proceso cambiado, el asunto y cuerpo se ajustan a singular ("Tienes 1 novedad...").
+Renderizado con tabla HTML real (responsive). **Límite de filas visibles**: se muestran las primeras `Notifications:DigestMaxRows` (configurable, **default 5**), ordenadas por fecha de actuación más reciente; el resto se resume en la línea "y {remaining} procesos más con novedades" + el botón al dashboard. `{remaining} = N − filasMostradas`, y esa línea solo aparece si `remaining > 0`. Si hay 1 solo proceso, asunto y cuerpo van en singular ("Tienes 1 novedad..."). Contar en **procesos**, coherente con el asunto ("{N} novedades").
 
 **WhatsApp digest — FUERA DEL MVP**
 
@@ -2462,8 +2484,21 @@ Crear `Directory.Build.props` con:
         - FORZAR RELOAD del listado para que los nuevos aparezcan.
    e. OCULTAR el banner global.
 7. En paralelo, el email "import complete" ya llegó al abogado
-   (notificación extra-app, sirve si cerró el navegador).
+   (notificación extra-app, sirve si cerró el navegador). Si hubo errores, el email lleva
+   ADJUNTO un CSV con los procesos que fallaron (ver abajo).
 ```
+
+**CSV de errores (compartido: adjunto de email + descarga en la UI):**
+
+Cuando `error_count > 0`, hay que decirle al abogado CUÁLES procesos fallaron para que los agregue manualmente. Se construye un CSV desde `import_jobs.errors` (`[{ row, radicado, code, message }]`):
+
+- **Columnas**: `Fila`, `Radicado`, `Motivo` (el `message` legible; ej. "Radicado inválido: no tiene 23 dígitos", "No encontrado en Rama Judicial").
+- **Encoding**: **UTF-8 con BOM** — obligatorio para que Excel en Windows muestre bien los acentos (nombres colombianos: Villamaría, Muñoz, etc.). Sin BOM se ve mojibake.
+- **Anti CSV-injection**: sanitizar celdas que empiecen con `= + - @` (prefijar con `'` o envolver y escapar). Los datos vienen de un Excel subido por el usuario → potencialmente hostiles.
+- **Builder compartido**: un único `ImportErrorsCsvBuilder` (Infrastructure) usado por DOS consumidores, para que el CSV sea IDÉNTICO en ambos:
+  1. **Adjunto del email** `ImportComplete` (solo si `error_count > 0`), vía attachment de Resend (`procesos_con_errores.csv`, `text/csv`).
+  2. **Endpoint de descarga** `GET /api/v1/imports/{id}/errors.csv` que consume el botón "descargar CSV de errores" del popup. El frontend NO genera el CSV client-side (evita divergencia de formato y problemas de acentos): descarga este endpoint.
+- El copy del email debe referenciar el adjunto: *"Adjuntamos un archivo con los {N} procesos que no se pudieron cargar automáticamente, para que los agregues manualmente."*
 
 **Implementación del banner** (Angular): servicio singleton `ImportProgressService` con dos signals — `activeImport = signal<ImportJob | null>(null)` (banner + bloqueo de botón) y `completedJob = signal<ImportJob | null>(null)` (dispara el popup de resumen). `ImportsService.getActive()` traduce la respuesta cruda del backend (200 con el job directo, o 204 → `null`) a `ImportJob | null`, parseando `errors` (string JSON) a array.
 

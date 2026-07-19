@@ -27,6 +27,9 @@ public interface ISyncJobScheduler
     /// <summary>Re-enqueues the bulk-import job after a WAF cooldown pause.</summary>
     void ScheduleBulkImport(Guid importJobId, TimeSpan delay);
 
-    /// <summary>Triggers the ImportComplete notification dispatch.</summary>
-    void EnqueueImportComplete(Guid importJobId);
+    /// <summary>
+    /// Triggers dispatch of an already-inserted outbox row (event_type='ImportComplete'),
+    /// written by BulkImportJob on completion.
+    /// </summary>
+    void EnqueueImportComplete(Guid outboxId);
 }
