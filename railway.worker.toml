@@ -2,9 +2,12 @@
 # Point this service's "Config File Path" to railway.worker.toml in the Railway dashboard.
 #
 # Secrets that must be set in the Railway dashboard (never here):
-#   ConnectionStrings__Postgres   — same Supabase string as the api service
-#   RESEND_APITOKEN               — same Resend API key as the api service (this role also
-#                                   drains the "notifications" queue and can dispatch emails)
+#   ConnectionStrings__Postgres         — same Supabase string as the api service
+#   ConnectionStrings__HangfireStorage  — OPTIONAL: same value as the api service (a separate
+#                                         Postgres/Supabase project just for Hangfire's schema).
+#                                         Falls back to ConnectionStrings__Postgres if unset.
+#   RESEND_APITOKEN                     — same Resend API key as the api service (this role also
+#                                         drains the "notifications" queue and can dispatch emails)
 
 [build]
 dockerfilePath = "Dockerfile.worker"

@@ -38,8 +38,7 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Connection string 'Postgres' is not configured.");
 
         // Cap the Npgsql pool so api + worker together stay under the database connection
-        // limit (Supabase free-tier session pooler = 15). EF Core and Hangfire share this
-        // pool (same connection string), so this caps both. Budget: api pool + worker pool +
+        // limit (Supabase free-tier session pooler = 15). Budget: api pool + worker pool +
         // headroom ≤ the plan's limit. Overridable per environment; null → Npgsql default (100).
         var maxPoolSize = configuration.GetValue<int?>("Database:MaxPoolSize");
         if (maxPoolSize is int poolSize)
@@ -54,6 +53,28 @@ public static class DependencyInjection
             options
                 .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention());
+
+        // Hangfire storage can live on a SEPARATE Postgres instance (e.g. its own free-tier
+        // Supabase project) so its server processes (workers + internal dispatchers:
+        // ServerWatchdog, ExpirationManager, CountersAggregator, DelayedJobScheduler,
+        // RecurringJobScheduler, ...) don't compete with EF Core for the SAME 15-connection
+        // budget. Optional: falls back to the app's own (already pool-capped) connection
+        // string when ConnectionStrings:HangfireStorage isn't set — fully backward-compatible.
+        var hangfireConnectionString = configuration.GetConnectionString("HangfireStorage");
+        if (hangfireConnectionString is not null)
+        {
+            if (maxPoolSize is int hangfirePoolSize)
+            {
+                hangfireConnectionString = new Npgsql.NpgsqlConnectionStringBuilder(hangfireConnectionString)
+                {
+                    MaxPoolSize = hangfirePoolSize,
+                }.ConnectionString;
+            }
+        }
+        else
+        {
+            hangfireConnectionString = connectionString;
+        }
 
         // IEmailSender (Resend) is registered below, in the notifications section.
 
@@ -155,13 +176,14 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddScoped<ICatalogReader, CachedCatalogReader>();
 
-        // ── Hangfire storage (separate 'hangfire' schema) ─────────────────────
+        // ── Hangfire storage (separate 'hangfire' schema; possibly a separate Postgres
+        //    instance too — see hangfireConnectionString above) ─────────────────────
         services.AddHangfire(cfg => cfg
             .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
             .UseSimpleAssemblyNameTypeSerializer()
             .UseRecommendedSerializerSettings()
             .UsePostgreSqlStorage(
-                opts => opts.UseNpgsqlConnection(connectionString),
+                opts => opts.UseNpgsqlConnection(hangfireConnectionString),
                 new PostgreSqlStorageOptions
                 {
                     SchemaName = "hangfire",

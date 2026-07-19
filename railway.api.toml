@@ -2,11 +2,16 @@
 # Point this service's "Config File Path" to railway.api.toml in the Railway dashboard.
 #
 # Secrets that must be set in the Railway dashboard (never here):
-#   ConnectionStrings__Postgres   — Supabase connection string
-#   Jwt__Secret                   — min 32 chars, generate with: openssl rand -hex 32
-#   Hangfire__DashboardPassword   — password for /hangfire Basic Auth prompt
-#   RESEND_APITOKEN               — Resend API key (read via raw env var, NOT Resend__ApiKey —
-#                                   also set on the worker service, it drains "notifications" too)
+#   ConnectionStrings__Postgres         — Supabase connection string
+#   ConnectionStrings__HangfireStorage  — OPTIONAL: a SEPARATE Postgres/Supabase project for
+#                                         Hangfire's own schema, so its server processes don't
+#                                         compete with EF Core for the same 15-connection budget.
+#                                         Falls back to ConnectionStrings__Postgres if unset.
+#                                         Same value must be set on the worker service too.
+#   Jwt__Secret                         — min 32 chars, generate with: openssl rand -hex 32
+#   Hangfire__DashboardPassword         — password for /hangfire Basic Auth prompt
+#   RESEND_APITOKEN                     — Resend API key (raw env var, NOT Resend__ApiKey —
+#                                         also set on the worker service, it drains "notifications" too)
 
 [build]
 dockerfilePath = "Dockerfile.api"
