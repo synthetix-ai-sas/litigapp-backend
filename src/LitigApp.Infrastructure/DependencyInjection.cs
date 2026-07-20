@@ -103,6 +103,13 @@ public static class DependencyInjection
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders();
 
+        // Token lifetime driven by AuthOptions so the email template and the real
+        // expiry always agree — change appsettings "Auth:TokenLifespanMinutes" to move both.
+        services.AddOptions<DataProtectionTokenProviderOptions>()
+            .Configure<Microsoft.Extensions.Options.IOptions<LitigApp.Application.Features.Auth.AuthOptions>>(
+                (tokenOptions, authOpts) =>
+                    tokenOptions.TokenLifespan = TimeSpan.FromMinutes(authOpts.Value.TokenLifespanMinutes));
+
         if (!isWorker)
         {
             services.AddOptions<JwtOptions>()
@@ -112,6 +119,11 @@ public static class DependencyInjection
 
             services.AddOptions<LitigApp.Infrastructure.Identity.LegalOptions>()
                 .BindConfiguration(LitigApp.Infrastructure.Identity.LegalOptions.SectionName)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddOptions<LitigApp.Application.Features.Auth.AuthOptions>()
+                .BindConfiguration(LitigApp.Application.Features.Auth.AuthOptions.SectionName)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 

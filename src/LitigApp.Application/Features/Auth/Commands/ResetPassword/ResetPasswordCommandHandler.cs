@@ -3,20 +3,22 @@ using LitigApp.Domain.Common;
 
 namespace LitigApp.Application.Features.Auth.Commands.ResetPassword;
 
-public sealed class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand, Unit>
+public sealed class ResetPasswordCommandHandler(
+    IIdentityService identityService,
+    IAuthRepository authRepository) : ICommandHandler<ResetPasswordCommand, Unit>
 {
-    private readonly IIdentityService _identityService;
-
-    public ResetPasswordCommandHandler(IIdentityService identityService) =>
-        _identityService = identityService;
-
     public async Task<Result<Unit>> HandleAsync(ResetPasswordCommand command, CancellationToken ct = default)
     {
-        var opResult = await _identityService.ResetPasswordAsync(
-            command.Email, command.ResetToken, command.NewPassword, ct);
+        var opResult = await identityService.ResetPasswordByUserIdAsync(
+            command.Uid, command.Token, command.NewPassword, ct);
 
-        return opResult.Succeeded
-            ? Result<Unit>.Success(Unit.Value)
-            : Result<Unit>.Failure(opResult.Error!);
+        if (!opResult.Succeeded)
+            return Result<Unit>.Failure(opResult.Error!);
+
+        // Force re-login on all devices — the password changed, old refresh tokens are stale.
+        await authRepository.RevokeAllUserRefreshTokensAsync(opResult.UserId!, ct);
+        await authRepository.SaveChangesAsync(ct);
+
+        return Result<Unit>.Success(Unit.Value);
     }
 }
