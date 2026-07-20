@@ -41,7 +41,7 @@ public class RequestPasswordResetCommandHandlerTests
         Assert.True(result.IsSuccess);
         await _emailSender.DidNotReceive().SendAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+            Arg.Any<string?>(), Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class RequestPasswordResetCommandHandlerTests
             .Returns(new PasswordResetData("user-id-1", "Test User", "reset-token-abc"));
         _emailSender
             .SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                Arg.Any<string?>(), Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>())
             .Returns(LitigApp.Domain.Common.Result<string>.Success("ok"));
 
         var result = await _sut.HandleAsync(new RequestPasswordResetCommand("user@example.com"));

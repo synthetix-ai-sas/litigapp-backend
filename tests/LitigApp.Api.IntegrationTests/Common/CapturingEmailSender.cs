@@ -15,7 +15,8 @@ public sealed class CapturingEmailSender : IEmailSender
     public ConcurrentQueue<SentEmail> SentEmails { get; } = new();
 
     public Task<Result<string>> SendAsync(
-        string toEmail, string subject, string htmlBody, string? idempotencyKey = null, CancellationToken ct = default)
+        string toEmail, string subject, string htmlBody, string? idempotencyKey = null,
+        IReadOnlyList<EmailAttachment>? attachments = null, CancellationToken ct = default)
     {
         SentEmails.Enqueue(new SentEmail(toEmail, subject, htmlBody));
         return Task.FromResult(Result<string>.Success("fake-email-id"));
