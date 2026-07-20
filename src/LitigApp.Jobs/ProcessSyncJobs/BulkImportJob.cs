@@ -154,7 +154,7 @@ public sealed class BulkImportJob(
         // Insert outbox event for ImportComplete email (blueprint §9 step 7) and trigger
         // its dispatch — pass the OUTBOX row id, not the import job id: the payload already
         // carries everything DispatchImportCompleteJob needs to render/send.
-        var outboxId = await InsertImportCompleteOutboxAsync(job, now, ct);
+        var outboxId = await InsertImportCompleteOutboxAsync(job, errors, now, ct);
         scheduler.EnqueueImportComplete(outboxId);
 
         logger.LogInformation(
@@ -179,7 +179,7 @@ public sealed class BulkImportJob(
     }
 
     private async Task<Guid> InsertImportCompleteOutboxAsync(
-        ImportJob job, DateTimeOffset now, CancellationToken ct)
+        ImportJob job, IReadOnlyList<ImportRowError> errors, DateTimeOffset now, CancellationToken ct)
     {
         var payload = JsonSerializer.Serialize(new ImportCompleteOutboxPayload(
             ImportJobId: job.Id,
@@ -188,7 +188,8 @@ public sealed class BulkImportJob(
             SuccessCount: job.SuccessCount,
             DuplicateCount: job.DuplicateCount,
             ErrorCount: job.ErrorCount,
-            CompletedAt: now));
+            CompletedAt: now,
+            Errors: errors.Select(e => new ImportErrorRow(e.Row, e.Radicado, e.Code, e.Message)).ToList()));
 
         var outboxId = Guid.NewGuid();
         await outboxRepo.InsertAsync(new OutboxMessage

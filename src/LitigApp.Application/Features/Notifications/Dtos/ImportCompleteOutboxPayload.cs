@@ -15,4 +15,7 @@ public sealed record ImportCompleteOutboxPayload(
     [property: JsonPropertyName("successCount")] int SuccessCount,
     [property: JsonPropertyName("duplicateCount")] int DuplicateCount,
     [property: JsonPropertyName("errorCount")] int ErrorCount,
-    [property: JsonPropertyName("completedAt")] DateTimeOffset CompletedAt);
+    [property: JsonPropertyName("completedAt")] DateTimeOffset CompletedAt,
+    // Full per-row error detail — lets NotificationDispatchService build the CSV attachment
+    // (blueprint §9 "CSV de errores") without a DB round-trip at render time.
+    [property: JsonPropertyName("errors")] IReadOnlyList<ImportErrorRow> Errors);

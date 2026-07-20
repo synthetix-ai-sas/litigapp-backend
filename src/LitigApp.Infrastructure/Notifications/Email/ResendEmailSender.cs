@@ -4,6 +4,8 @@ using LitigApp.Domain.Common;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Resend;
+using ApplicationEmailAttachment = LitigApp.Application.Common.Abstractions.EmailAttachment;
+using ResendEmailAttachment = Resend.EmailAttachment;
 
 namespace LitigApp.Infrastructure.Notifications.Email;
 
@@ -23,7 +25,8 @@ internal sealed class ResendEmailSender(
     private static readonly Regex TagStripper = new("<[^>]+>", RegexOptions.Compiled);
 
     public async Task<Result<string>> SendAsync(
-        string toEmail, string subject, string htmlBody, string? idempotencyKey = null, CancellationToken ct = default)
+        string toEmail, string subject, string htmlBody, string? idempotencyKey = null,
+        IReadOnlyList<ApplicationEmailAttachment>? attachments = null, CancellationToken ct = default)
     {
         var opts = options.Value;
         var recipient = string.IsNullOrWhiteSpace(opts.DevRedirectTo) ? toEmail : opts.DevRedirectTo;
@@ -36,6 +39,18 @@ internal sealed class ResendEmailSender(
             HtmlBody = htmlBody,
             TextBody = TagStripper.Replace(htmlBody, string.Empty).Trim(),
         };
+
+        if (attachments is { Count: > 0 })
+        {
+            message.Attachments = attachments
+                .Select(a => new ResendEmailAttachment
+                {
+                    Filename = a.FileName,
+                    ContentType = a.ContentType,
+                    Content = a.Content,
+                })
+                .ToList();
+        }
 
         try
         {

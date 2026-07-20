@@ -2,6 +2,9 @@ using LitigApp.Domain.Common;
 
 namespace LitigApp.Application.Common.Abstractions;
 
+/// <summary>An email attachment as raw bytes — never written to disk (blueprint §9 CSV de errores).</summary>
+public sealed record EmailAttachment(string FileName, string ContentType, byte[] Content);
+
 public interface IEmailSender
 {
     /// <summary>
@@ -14,5 +17,6 @@ public interface IEmailSender
         string subject,
         string htmlBody,
         string? idempotencyKey = null,
+        IReadOnlyList<EmailAttachment>? attachments = null,
         CancellationToken ct = default);
 }

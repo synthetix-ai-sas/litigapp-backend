@@ -2,6 +2,7 @@ using LitigApp.Application.Common.Abstractions;
 using LitigApp.Application.Features.Notifications;
 using LitigApp.Domain.Common;
 using LitigApp.Domain.Processes;
+using LitigApp.Infrastructure.Imports;
 using LitigApp.Infrastructure.Notifications.Templates;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Infrastructure.Persistence.Repositories;
@@ -142,7 +143,8 @@ public sealed class DispatchUserNotificationsJobDigestTests : IAsyncLifetime
         });
 
         var dispatchService = new NotificationDispatchService(
-            identity, renderer, emailSender, outboxRepo, logRepo, notificationsOptions, _clock);
+            identity, renderer, emailSender, outboxRepo, logRepo, new ImportErrorsCsvBuilder(),
+            notificationsOptions, _clock);
 
         return new DispatchUserNotificationsJob(
             processRepo, logRepo, outboxRepo, dispatchService, _clock,
@@ -157,7 +159,8 @@ public sealed class DispatchUserNotificationsJobDigestTests : IAsyncLifetime
         public string? LastHtmlBody { get; private set; }
 
         public Task<Result<string>> SendAsync(
-            string toEmail, string subject, string htmlBody, string? idempotencyKey = null, CancellationToken ct = default)
+            string toEmail, string subject, string htmlBody, string? idempotencyKey = null,
+            IReadOnlyList<EmailAttachment>? attachments = null, CancellationToken ct = default)
         {
             SentCount++;
             LastToEmail = toEmail;
