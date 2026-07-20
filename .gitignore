@@ -45,7 +45,6 @@ appsettings.Local.json
 .env.*
 !.env.example
 secrets.json
-**/Properties/launchSettings.json
 
 ## Rider / JetBrains
 .idea/
