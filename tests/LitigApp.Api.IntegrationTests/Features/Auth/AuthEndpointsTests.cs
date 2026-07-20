@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using LitigApp.Api.Features.Auth;
 using LitigApp.Api.IntegrationTests.Common;
@@ -254,5 +255,135 @@ public sealed class AuthEndpointsTests : IClassFixture<AuthApiFactory>
         me.Should().NotBeNull();
         me!.Email.Should().Be(email);
         me.UserId.Should().NotBeNullOrWhiteSpace();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Password-reset tests
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task PasswordReset_WithNonExistentEmail_Returns200()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/v1/auth/password-reset/request",
+            new { email = "ghost_nobody@example.com" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<PasswordResetRequestedResponse>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        body!.Message.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task PasswordReset_FullFlow_ChangesPassword()
+    {
+        const string email = "pr_fullflow@example.com";
+        const string oldPassword = "Password123";
+        const string newPassword = "NewPassword456";
+
+        await _client.PostAsJsonAsync("/api/v1/auth/register", new
+        {
+            email, password = oldPassword, fullName = "PR Full Flow",
+            acceptedTerms = true, acceptedPrivacy = true
+        });
+
+        var requestResp = await _client.PostAsJsonAsync(
+            "/api/v1/auth/password-reset/request", new { email });
+        requestResp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var sentEmail = _factory.EmailSender.SentEmails
+            .Where(e => e.To == email)
+            .Should().ContainSingle().Subject;
+
+        var (uid, token) = ExtractResetParams(sentEmail.HtmlBody);
+
+        var confirmResp = await _client.PostAsJsonAsync(
+            "/api/v1/auth/password-reset/confirm",
+            new { uid, token, newPassword });
+        confirmResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // New password works
+        var loginNew = await _client.PostAsJsonAsync(
+            "/api/v1/auth/login", new { email, password = newPassword });
+        loginNew.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Old password is rejected
+        var loginOld = await _client.PostAsJsonAsync(
+            "/api/v1/auth/login", new { email, password = oldPassword });
+        loginOld.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task PasswordReset_WithInvalidToken_Returns400()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/v1/auth/password-reset/confirm",
+            new
+            {
+                uid = "00000000-0000-0000-0000-000000000000",
+                token = "this-is-not-a-valid-identity-token",
+                newPassword = "NewPassword123"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task PasswordReset_RevokesRefreshTokensAfterReset()
+    {
+        const string email = "pr_revoke@example.com";
+        const string oldPassword = "Password123";
+        const string newPassword = "NewPassword456";
+
+        await _client.PostAsJsonAsync("/api/v1/auth/register", new
+        {
+            email, password = oldPassword, fullName = "PR Revoke User",
+            acceptedTerms = true, acceptedPrivacy = true
+        });
+
+        var loginResp = await _client.PostAsJsonAsync(
+            "/api/v1/auth/login", new { email, password = oldPassword });
+        var oldTokens = await loginResp.Content.ReadFromJsonAsync<AuthTokensResponse>();
+
+        await _client.PostAsJsonAsync(
+            "/api/v1/auth/password-reset/request", new { email });
+
+        var sentEmail = _factory.EmailSender.SentEmails
+            .Where(e => e.To == email)
+            .Should().ContainSingle().Subject;
+
+        var (uid, token) = ExtractResetParams(sentEmail.HtmlBody);
+
+        var confirmResp = await _client.PostAsJsonAsync(
+            "/api/v1/auth/password-reset/confirm",
+            new { uid, token, newPassword });
+        confirmResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Old refresh token must be revoked after the password reset
+        var refreshResp = await _client.PostAsJsonAsync("/api/v1/auth/refresh", new
+        {
+            accessToken = oldTokens!.AccessToken,
+            refreshToken = oldTokens.RefreshToken
+        });
+        refreshResp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // Extracts uid and URL-decoded token from the reset link embedded in the HTML email body.
+    private static (string Uid, string Token) ExtractResetParams(string htmlBody)
+    {
+        var match = Regex.Match(
+            htmlBody,
+            @"href=""(https://test\.litigapp\.co/reset-password[^""]+)""",
+            RegexOptions.IgnoreCase);
+
+        match.Success.Should().BeTrue("the email should contain the reset href");
+
+        var uri = new Uri(match.Groups[1].Value);
+        var parts = uri.Query.TrimStart('?')
+            .Split('&')
+            .Select(p => p.Split('=', 2))
+            .ToDictionary(p => p[0], p => Uri.UnescapeDataString(p[1]));
+
+        return (parts["uid"], parts["token"]);
     }
 }
