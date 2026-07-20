@@ -10,6 +10,7 @@ using LitigApp.Api.Features.Processes;
 using LitigApp.Api.Hangfire;
 using LitigApp.Api.OpenApi;
 using LitigApp.Application;
+using LitigApp.Application.Common.Options;
 using LitigApp.Infrastructure;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Persistence;
@@ -70,11 +71,21 @@ try
         builder.Services.AddCors(options =>
             options.AddDefaultPolicy(policy =>
             {
-                var allowedOrigins = builder.Configuration
+                var corsOrigins = builder.Configuration
                     .GetSection(CorsOptions.SectionName)
                     .Get<CorsOptions>()?.AllowedOrigins ?? [];
 
-                policy.WithOrigins(allowedOrigins)
+                var frontendBaseUrl = builder.Configuration
+                    .GetSection(AppOptions.SectionName)
+                    .Get<AppOptions>()?.FrontendBaseUrl;
+
+                // Always include the configured frontend URL so Cors:AllowedOrigins
+                // never needs to be updated alongside App:FrontendBaseUrl.
+                var origins = string.IsNullOrEmpty(frontendBaseUrl)
+                    ? corsOrigins
+                    : corsOrigins.Append(frontendBaseUrl.TrimEnd('/')).Distinct().ToArray();
+
+                policy.WithOrigins(origins)
                       .AllowAnyHeader()
                       .AllowAnyMethod();
             }));
