@@ -12,15 +12,14 @@ public sealed class RequestPasswordResetCommandHandler(
     IDateTimeProvider dateTimeProvider,
     IOptions<AuthOptions> authOptions) : ICommandHandler<RequestPasswordResetCommand, Unit>
 {
-    private const int TokenLifespanMinutes = 60;
-
     public async Task<Result<Unit>> HandleAsync(RequestPasswordResetCommand command, CancellationToken ct = default)
     {
         var resetData = await identityService.GeneratePasswordResetAsync(command.Email, ct);
 
         if (resetData is not null)
         {
-            var frontendBase = authOptions.Value.FrontendBaseUrl.TrimEnd('/');
+            var opts = authOptions.Value;
+            var frontendBase = opts.FrontendBaseUrl.TrimEnd('/');
             var encodedToken = WebUtility.UrlEncode(resetData.Token);
             var resetUrl = $"{frontendBase}/reset-password?token={encodedToken}&uid={resetData.UserId}";
 
@@ -28,7 +27,7 @@ public sealed class RequestPasswordResetCommandHandler(
             {
                 ["AbogadoNombre"] = WebUtility.HtmlEncode(resetData.FullName),
                 ["UrlRestablecimiento"] = resetUrl,
-                ["MinutosExpiracion"] = TokenLifespanMinutes,
+                ["MinutosExpiracion"] = opts.TokenLifespanMinutes,
                 ["Año"] = dateTimeProvider.UtcNow.Year,
             };
 
