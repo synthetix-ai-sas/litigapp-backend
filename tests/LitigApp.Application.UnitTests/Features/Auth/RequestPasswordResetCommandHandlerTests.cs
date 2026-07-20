@@ -1,4 +1,5 @@
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Common.Options;
 using LitigApp.Application.Features.Auth;
 using LitigApp.Application.Features.Auth.Commands.RequestPasswordReset;
 using Microsoft.Extensions.Options;
@@ -24,9 +25,10 @@ public class RequestPasswordResetCommandHandlerTests
         var clock = Substitute.For<IDateTimeProvider>();
         clock.UtcNow.Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
 
-        var opts = Options.Create(new AuthOptions { FrontendBaseUrl = "https://test.litigapp.co" });
+        var authOpts = Options.Create(new AuthOptions());
+        var appOpts = Options.Create(new AppOptions { FrontendBaseUrl = "https://test.litigapp.co" });
 
-        _sut = new RequestPasswordResetCommandHandler(_identityService, _emailSender, renderer, clock, opts);
+        _sut = new RequestPasswordResetCommandHandler(_identityService, _emailSender, renderer, clock, authOpts, appOpts);
     }
 
     [Fact]

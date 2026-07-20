@@ -14,7 +14,7 @@ public class ImportPreviewCacheTests
         [new Dictionary<string, string?> { ["A"] = "11001310300120230001200" }]);
 
     private static ImportPreviewCache BuildCache() =>
-        new(new MemoryCache(new MemoryCacheOptions()), Options.Create(new ImportOptions()));
+        new(new MemoryCache(new MemoryCacheOptions()), Microsoft.Extensions.Options.Options.Create(new ImportOptions()));
 
     [Fact]
     public void Set_ThenGet_ReturnsSamePreview()

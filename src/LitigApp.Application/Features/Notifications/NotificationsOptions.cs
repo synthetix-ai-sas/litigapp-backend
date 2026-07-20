@@ -10,8 +10,4 @@ public sealed class NotificationsOptions
     /// <summary>Visible rows in the digest before "y N procesos más" (default 5).</summary>
     [Range(1, 50)]
     public int DigestMaxRows { get; init; } = 5;
-
-    /// <summary>Frontend base URL used to build the CTA links (e.g. /novelties, /processes).</summary>
-    [Required]
-    public string AppBaseUrl { get; init; } = "https://app.litigapp.co";
 }

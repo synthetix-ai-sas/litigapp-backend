@@ -4,7 +4,7 @@ namespace LitigApp.Infrastructure.Identity;
 
 public sealed class JwtOptions
 {
-    public const string SectionName = "Jwt";
+    public const string SectionName = "Auth:Jwt";
 
     [Required, MinLength(32)]
     public string Secret { get; init; } = default!;

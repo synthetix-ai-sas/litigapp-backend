@@ -1,5 +1,6 @@
 using Hangfire;
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Infrastructure.Options;
 using LitigApp.Jobs.ProcessSyncJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,9 +52,9 @@ public static class DependencyInjection
             // Worker count drives how many jobs run (and thus DB connections) at once. Keep it
             // within the pool budget (see Database:MaxPoolSize) — the default is fine for a big
             // DB but must be lowered for Supabase free tier. The api role stays light.
-            var configuredWorkers = configuration.GetValue<int?>("Hangfire:WorkerCount");
+            var hangfireOpts = configuration.GetSection(HangfireOptions.SectionName).Get<HangfireOptions>() ?? new HangfireOptions();
             opts.WorkerCount = isWorker
-                ? (configuredWorkers is int w && w > 0 ? w : Math.Max(Environment.ProcessorCount * 2, 4))
+                ? (hangfireOpts.WorkerCount is int w && w > 0 ? w : Math.Max(Environment.ProcessorCount * 2, 4))
                 : 2;
         });
 

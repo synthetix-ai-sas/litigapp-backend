@@ -12,7 +12,7 @@ public class ResendEmailSenderTests
     private readonly IResend _resend = Substitute.For<IResend>();
 
     private ResendEmailSender CreateSut(ResendSenderOptions? opts = null) =>
-        new(_resend, Options.Create(opts ?? new ResendSenderOptions
+        new(_resend, Microsoft.Extensions.Options.Options.Create(opts ?? new ResendSenderOptions
         {
             FromAddress = "contac@notifications.synthetixaisas.com",
             FromName = "LitigApp",

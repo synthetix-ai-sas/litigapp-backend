@@ -10,6 +10,7 @@ using LitigApp.Application.Features.Auth.Commands.RequestPasswordReset;
 using LitigApp.Application.Features.Auth.Commands.ResetPassword;
 using LitigApp.Domain.Common;
 using LitigApp.Infrastructure.Identity;
+using LitigApp.Infrastructure.Options;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;

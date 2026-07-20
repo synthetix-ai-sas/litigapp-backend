@@ -1,5 +1,6 @@
 using System.Text.Json;
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Common.Options;
 using LitigApp.Application.Features.Notifications;
 using LitigApp.Application.Features.Notifications.Dtos;
 using LitigApp.Domain.Common;
@@ -27,7 +28,8 @@ public class NotificationDispatchServiceTests
 
     private NotificationDispatchService CreateSut(int digestMaxRows = 5) => new(
         _identity, _renderer, _emailSender, _outboxRepo, _logRepo,
-        Options.Create(new NotificationsOptions { DigestMaxRows = digestMaxRows, AppBaseUrl = "https://app.litigapp.co" }),
+        Options.Create(new NotificationsOptions { DigestMaxRows = digestMaxRows }),
+        Options.Create(new AppOptions { FrontendBaseUrl = "https://app.litigapp.co" }),
         _clock);
 
     private static OutboxMessage UserDigestMessage(Guid id, string userId, params UserDigestProcessPayload[] processes)

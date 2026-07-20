@@ -1,5 +1,6 @@
 using System.Net;
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Common.Options;
 using LitigApp.Domain.Common;
 using Microsoft.Extensions.Options;
 
@@ -10,7 +11,8 @@ public sealed class RequestPasswordResetCommandHandler(
     IEmailSender emailSender,
     IEmailTemplateRenderer templateRenderer,
     IDateTimeProvider dateTimeProvider,
-    IOptions<AuthOptions> authOptions) : ICommandHandler<RequestPasswordResetCommand, Unit>
+    IOptions<AuthOptions> authOptions,
+    IOptions<AppOptions> appOptions) : ICommandHandler<RequestPasswordResetCommand, Unit>
 {
     public async Task<Result<Unit>> HandleAsync(RequestPasswordResetCommand command, CancellationToken ct = default)
     {
@@ -19,7 +21,7 @@ public sealed class RequestPasswordResetCommandHandler(
         if (resetData is not null)
         {
             var opts = authOptions.Value;
-            var frontendBase = opts.FrontendBaseUrl.TrimEnd('/');
+            var frontendBase = appOptions.Value.FrontendBaseUrl.TrimEnd('/');
             var encodedToken = WebUtility.UrlEncode(resetData.Token);
             var resetUrl = $"{frontendBase}/reset-password?token={encodedToken}&uid={resetData.UserId}";
 

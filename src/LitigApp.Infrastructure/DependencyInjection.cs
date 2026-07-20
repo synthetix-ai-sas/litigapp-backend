@@ -2,6 +2,7 @@ using System.Net;
 using Hangfire;
 using Hangfire.PostgreSql;
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Common.Options;
 using LitigApp.Application.Features.Imports;
 using LitigApp.Application.Features.Notifications;
 using LitigApp.Infrastructure.Catalog;
@@ -10,6 +11,7 @@ using LitigApp.Infrastructure.ExternalApis.RamaJudicial;
 using LitigApp.Infrastructure.Identity;
 using LitigApp.Infrastructure.Notifications.Email;
 using LitigApp.Infrastructure.Notifications.Templates;
+using LitigApp.Infrastructure.Options;
 using LitigApp.Infrastructure.Persistence;
 using LitigApp.Infrastructure.Pdf;
 using LitigApp.Infrastructure.Persistence.Repositories;
@@ -40,8 +42,8 @@ public static class DependencyInjection
         // Cap the Npgsql pool so api + worker together stay under the database connection
         // limit (Supabase free-tier session pooler = 15). Budget: api pool + worker pool +
         // headroom ≤ the plan's limit. Overridable per environment; null → Npgsql default (100).
-        var maxPoolSize = configuration.GetValue<int?>("Database:MaxPoolSize");
-        if (maxPoolSize is int poolSize)
+        var dbOptions = configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
+        if (dbOptions.MaxPoolSize is int poolSize)
         {
             connectionString = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
             {
@@ -63,7 +65,7 @@ public static class DependencyInjection
         var hangfireConnectionString = configuration.GetConnectionString("HangfireStorage");
         if (hangfireConnectionString is not null)
         {
-            if (maxPoolSize is int hangfirePoolSize)
+            if (dbOptions.MaxPoolSize is int hangfirePoolSize)
             {
                 hangfireConnectionString = new Npgsql.NpgsqlConnectionStringBuilder(hangfireConnectionString)
                 {
@@ -117,13 +119,18 @@ public static class DependencyInjection
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddOptions<LitigApp.Infrastructure.Identity.LegalOptions>()
-                .BindConfiguration(LitigApp.Infrastructure.Identity.LegalOptions.SectionName)
+            services.AddOptions<LegalOptions>()
+                .BindConfiguration(LegalOptions.SectionName)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
             services.AddOptions<LitigApp.Application.Features.Auth.AuthOptions>()
                 .BindConfiguration(LitigApp.Application.Features.Auth.AuthOptions.SectionName)
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            services.AddOptions<AppOptions>()
+                .BindConfiguration(AppOptions.SectionName)
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 

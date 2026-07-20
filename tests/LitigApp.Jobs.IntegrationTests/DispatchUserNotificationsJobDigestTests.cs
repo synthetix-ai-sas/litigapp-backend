@@ -1,4 +1,5 @@
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Common.Options;
 using LitigApp.Application.Features.Notifications;
 using LitigApp.Domain.Common;
 using LitigApp.Domain.Processes;
@@ -135,14 +136,11 @@ public sealed class DispatchUserNotificationsJobDigestTests : IAsyncLifetime
         var outboxRepo = new OutboxRepository(_db);
         var renderer = new ScribanEmailTemplateRenderer();
         var identity = new FakeIdentityService(userId, email, fullName);
-        var notificationsOptions = Options.Create(new NotificationsOptions
-        {
-            DigestMaxRows = 5,
-            AppBaseUrl = "https://app.litigapp.co",
-        });
+        var notificationsOptions = Options.Create(new NotificationsOptions { DigestMaxRows = 5 });
+        var appOptions = Options.Create(new AppOptions { FrontendBaseUrl = "https://app.litigapp.co" });
 
         var dispatchService = new NotificationDispatchService(
-            identity, renderer, emailSender, outboxRepo, logRepo, notificationsOptions, _clock);
+            identity, renderer, emailSender, outboxRepo, logRepo, notificationsOptions, appOptions, _clock);
 
         return new DispatchUserNotificationsJob(
             processRepo, logRepo, outboxRepo, dispatchService, _clock,

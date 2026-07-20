@@ -1,5 +1,6 @@
 using System.Text.Json;
 using LitigApp.Application.Common.Abstractions;
+using LitigApp.Application.Common.Options;
 using LitigApp.Application.Features.Notifications.Dtos;
 using LitigApp.Domain.Notifications;
 using Microsoft.Extensions.Options;
@@ -14,6 +15,7 @@ public sealed class NotificationDispatchService(
     IOutboxRepository outboxRepo,
     INotificationLogRepository notificationLogRepo,
     IOptions<NotificationsOptions> options,
+    IOptions<AppOptions> appOptions,
     IDateTimeProvider clock) : INotificationDispatchService
 {
     public async Task DispatchAsync(OutboxMessage message, CancellationToken ct)
@@ -31,6 +33,7 @@ public sealed class NotificationDispatchService(
         Guid[] processIds;
 
         var opts = options.Value;
+        var frontendBaseUrl = appOptions.Value.FrontendBaseUrl;
         var year = clock.UtcNow.Year;
 
         switch (message.EventType)
@@ -46,7 +49,7 @@ public sealed class NotificationDispatchService(
                 var cut = DigestPayloadBuilder.Build(changed, opts.DigestMaxRows);
 
                 template = EmailTemplate.UserDigest;
-                model = UserDigestEmailModelBuilder.Build(profile.FullName, cut, $"{opts.AppBaseUrl}/novelties", year);
+                model = UserDigestEmailModelBuilder.Build(profile.FullName, cut, $"{frontendBaseUrl}/novelties", year);
                 subject = UserDigestEmailModelBuilder.BuildSubject(payload.TotalProcessesChanged);
                 processIds = payload.Processes.Select(p => p.Id).ToArray();
                 break;
@@ -59,7 +62,7 @@ public sealed class NotificationDispatchService(
                 template = EmailTemplate.ImportComplete;
                 model = ImportCompleteEmailModelBuilder.Build(
                     profile.FullName, payload.FileName, payload.SuccessCount, payload.DuplicateCount,
-                    payload.ErrorCount, $"{opts.AppBaseUrl}/processes", year);
+                    payload.ErrorCount, $"{frontendBaseUrl}/processes", year);
                 subject = ImportCompleteEmailModelBuilder.BuildSubject(payload.SuccessCount);
                 processIds = [];
                 break;
