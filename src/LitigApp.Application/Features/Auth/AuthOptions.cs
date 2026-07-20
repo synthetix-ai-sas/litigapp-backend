@@ -16,5 +16,5 @@ public sealed class AuthOptions
     /// Must match DataProtectionTokenProviderOptions.TokenLifespan configured in Infrastructure.
     /// </summary>
     [Range(1, 60)]
-    public int TokenLifespanMinutes { get; init; } = 60;
+    public int TokenLifespanMinutes { get; init; } = 15;
 }
