@@ -15,6 +15,6 @@ public sealed class AuthOptions
     /// Lifetime of the password reset token in minutes.
     /// Must match DataProtectionTokenProviderOptions.TokenLifespan configured in Infrastructure.
     /// </summary>
-    [Range(1, 1440)]
+    [Range(1, 60)]
     public int TokenLifespanMinutes { get; init; } = 60;
 }
