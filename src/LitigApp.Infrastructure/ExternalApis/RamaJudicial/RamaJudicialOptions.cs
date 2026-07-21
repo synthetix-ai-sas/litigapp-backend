@@ -9,7 +9,7 @@ public sealed class RamaJudicialOptions
     public const string SectionName = "RamaJudicial";
 
     /// <summary>Base URL of the Rama Judicial API.</summary>
-    public string BaseUrl { get; init; } = "https://consultaprocesos.ramajudicial.gov.co:448";
+    public string BaseUrl { get; init; } = default!;
 
     /// <summary>
     /// Per-attempt HTTP timeout in seconds. Spike found overview can take up to 35s
@@ -29,4 +29,22 @@ public sealed class RamaJudicialOptions
 
     /// <summary>Maximum number of concurrent requests to the API (WAF protection).</summary>
     public int MaxConcurrentRequests { get; init; } = 1;
+
+    /// <summary>Browser-like headers sent with every request.</summary>
+    public RamaJudicialHeadersOptions Headers { get; init; } = new();
+
+    /// <summary>User-Agent strings rotated round-robin across requests (WAF evasion).</summary>
+    public string[] UserAgentPool { get; init; } = [];
+}
+
+/// <summary>Browser-like headers (bound from "RamaJudicial:Headers").</summary>
+public sealed class RamaJudicialHeadersOptions
+{
+    /// <summary>Origin header (site host, no port).</summary>
+    [Required]
+    public string Origin { get; init; } = default!;
+
+    /// <summary>Referer header (site host, trailing slash, no port).</summary>
+    [Required]
+    public string Referer { get; init; } = default!;
 }

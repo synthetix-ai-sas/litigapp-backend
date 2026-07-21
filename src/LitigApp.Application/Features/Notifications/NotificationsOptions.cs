@@ -13,5 +13,5 @@ public sealed class NotificationsOptions
 
     /// <summary>Frontend base URL used to build the CTA links (e.g. /novelties, /processes).</summary>
     [Required]
-    public string AppBaseUrl { get; init; } = "https://app.litigapp.co";
+    public string AppBaseUrl { get; init; } = default!;
 }

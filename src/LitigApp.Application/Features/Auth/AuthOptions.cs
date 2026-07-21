@@ -9,7 +9,7 @@ public sealed class AuthOptions
 
     /// <summary>Frontend base URL used to build the password reset link.</summary>
     [Required]
-    public string FrontendBaseUrl { get; init; } = "https://app.litigapp.co";
+    public string FrontendBaseUrl { get; init; } = default!;
 
     /// <summary>
     /// Lifetime of the password reset token in minutes.

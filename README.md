@@ -24,7 +24,7 @@ dotnet build
 dotnet run --project src/LitigApp.Api
 ```
 
-La API queda disponible en `http://localhost:5000`.
+La API queda disponible en `http://localhost:5119`.
 
 ## Comandos útiles
 
@@ -32,8 +32,8 @@ La API queda disponible en `http://localhost:5000`.
 |---------|-------------|
 | `dotnet build` | Compila la solución completa |
 | `dotnet test` | Corre todos los tests |
-| `dotnet run --project src/LitigApp.Api` | Inicia la API en localhost:5000 |
-| `docker compose up -d` | Levanta Postgres 16 en el puerto 5432 |
+| `dotnet run --project src/LitigApp.Api` | Inicia la API en localhost:5119 |
+| `docker compose up -d` | Levanta Postgres 16 en el puerto 5433 |
 | `docker compose down` | Detiene los contenedores |
 | `dotnet ef migrations add <Nombre> -p src/LitigApp.Infrastructure -s src/LitigApp.Api` | Crea una migración |
 | `dotnet ef database update -p src/LitigApp.Infrastructure -s src/LitigApp.Api` | Aplica migraciones |
@@ -59,13 +59,23 @@ litigapp-backend/
 Domain ← Application ← Infrastructure ← Jobs ← Api
 ```
 
-## Variables de entorno
+## Variables de entorno y config local
 
-Copia `appsettings.Development.json.example` (cuando exista) a `appsettings.Development.json` y rellena los valores. Los secretos nunca van en código ni en git.
+`appsettings.json` (versionado) tiene los valores no-secretos de **producción**; Railway solo inyecta secretos por env vars. Cada dev mantiene su propio `src/LitigApp.Api/appsettings.Development.json` (no versionado) con sus overrides locales. Mínimo para correr en local:
 
+```jsonc
+{
+  "ConnectionStrings": {
+    "Postgres": "Host=localhost;Port=5433;Database=litigapp;Username=litigapp;Password=litigapp_dev"
+  },
+  "Jwt": { "Secret": "<min-32-chars>" },
+  "Cors": { "AllowedOrigins": [ "http://localhost:4200", "https://localhost:4200", "capacitor://localhost" ] }
+}
 ```
-ConnectionStrings__DefaultConnection=Host=localhost;Port=5432;Database=litigapp;Username=litigapp;Password=litigapp_dev
-```
+
+Los secretos nunca van en código ni en git.
+
+`launchSettings.json` sí está versionado, con `RESEND_APITOKEN` como placeholder. Tras reemplazarlo por tu token real, corre `git update-index --skip-worktree src/LitigApp.Api/Properties/launchSettings.json` para que git no marque el cambio.
 
 ## Tech stack
 

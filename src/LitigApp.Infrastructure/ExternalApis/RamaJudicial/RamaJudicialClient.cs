@@ -22,14 +22,6 @@ internal sealed class RamaJudicialClient : IRamaJudicialClient
         PropertyNameCaseInsensitive = true
     };
 
-    // ── User-Agent rotation (WAF evasion) ─────────────────────────────────────
-    private static readonly string[] UserAgents =
-    [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
-    ];
-
     private readonly HttpClient _httpClient;
     private readonly RamaJudicialOptions _options;
     private readonly ILogger<RamaJudicialClient> _logger;
@@ -296,12 +288,19 @@ internal sealed class RamaJudicialClient : IRamaJudicialClient
     private HttpRequestMessage BuildGet(string url)
     {
         var req = new HttpRequestMessage(HttpMethod.Get, url);
-        var ua = UserAgents[(Interlocked.Increment(ref _uaIndex) & int.MaxValue) % UserAgents.Length];
-        req.Headers.TryAddWithoutValidation("User-Agent", ua);
+
+        // UA rotation from the config pool (WAF evasion)
+        var pool = _options.UserAgentPool;
+        if (pool.Length > 0)
+        {
+            var ua = pool[(Interlocked.Increment(ref _uaIndex) & int.MaxValue) % pool.Length];
+            req.Headers.TryAddWithoutValidation("User-Agent", ua);
+        }
+
         req.Headers.TryAddWithoutValidation("Accept", "application/json, text/plain, */*");
         req.Headers.TryAddWithoutValidation("Accept-Language", "es-ES,es;q=0.9");
-        req.Headers.TryAddWithoutValidation("Origin", "https://consultaprocesos.ramajudicial.gov.co");
-        req.Headers.TryAddWithoutValidation("Referer", "https://consultaprocesos.ramajudicial.gov.co/");
+        req.Headers.TryAddWithoutValidation("Origin", _options.Headers.Origin);
+        req.Headers.TryAddWithoutValidation("Referer", _options.Headers.Referer);
         return req;
     }
 
