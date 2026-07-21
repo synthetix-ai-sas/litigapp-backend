@@ -13,6 +13,9 @@
 #   RESEND_APITOKEN                     — Resend API key (raw env var, NOT Resend__ApiKey —
 #                                         also set on the worker service, it drains "notifications" too)
 
+# Non-secret prod values (Cors, Jwt Issuer/Audience) live only in appsettings.json —
+# don't re-add them here: env-var array overrides merge BY INDEX and corrupt lists.
+
 [build]
 dockerfilePath = "Dockerfile.api"
 
@@ -23,9 +26,3 @@ healthcheckPath  = "/health"
 healthcheckTimeout = 300
 restartPolicyType       = "ON_FAILURE"
 restartPolicyMaxRetries = 3
-
-[variables]
-# Non-secret production values. Local dev overrides these via appsettings.Development.json.
-Cors__AllowedOrigins__0 = "https://app.litigapp.co"
-Jwt__Issuer             = "https://api.litigapp.co"
-Jwt__Audience           = "https://app.litigapp.co"
