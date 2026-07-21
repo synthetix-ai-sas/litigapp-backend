@@ -1,5 +1,6 @@
 using LitigApp.Application.Common.Abstractions;
 using LitigApp.Application.Features.Imports;
+using LitigApp.Application.Features.Notifications.Dtos;
 using LitigApp.Domain.Imports;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -41,6 +42,12 @@ public static class ImportsEndpoints
         group.MapGet("/{id:guid}", GetById)
             .WithName("GetImportById")
             .WithSummary("Consulta directa de un job (para historial / link desde email)");
+
+        group.MapGet("/{id:guid}/errors.csv", DownloadErrorsCsv)
+            .WithName("DownloadImportErrorsCsv")
+            .WithSummary("CSV de los procesos que fallaron — mismo builder que el adjunto del email ImportComplete")
+            .Produces(StatusCodes.Status200OK, contentType: "text/csv")
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         return app;
     }
@@ -171,4 +178,32 @@ public static class ImportsEndpoints
         job.Id, job.FileName, job.TotalRows, job.ProcessedRows,
         job.SuccessCount, job.ErrorCount, job.Status,
         job.CreatedAt, job.CompletedAt, job.Errors);
+
+    // ── GET /{id}/errors.csv ──────────────────────────────────────────────────
+
+    private static readonly JsonSerializerOptions ErrorsJsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    private static async Task<IResult> DownloadErrorsCsv(
+        Guid id,
+        ICurrentUserService currentUser,
+        IImportJobRepository importRepo,
+        IImportErrorsCsvBuilder csvBuilder,
+        CancellationToken ct)
+    {
+        var job = await importRepo.GetByIdAsync(id, ct);
+        if (job is null || job.UserId != currentUser.UserId)
+            return TypedResults.NotFound();
+
+        var errors = DeserializeErrors(job.Errors);
+        var csvBytes = csvBuilder.Build(errors);
+
+        return TypedResults.File(csvBytes, "text/csv", "procesos_con_errores.csv");
+    }
+
+    private static List<ImportErrorRow> DeserializeErrors(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return [];
+        try { return JsonSerializer.Deserialize<List<ImportErrorRow>>(json, ErrorsJsonOptions) ?? []; }
+        catch { return []; }
+    }
 }
