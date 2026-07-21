@@ -16,6 +16,7 @@ public class NotificationDispatchServiceTests
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IOutboxRepository _outboxRepo = Substitute.For<IOutboxRepository>();
     private readonly INotificationLogRepository _logRepo = Substitute.For<INotificationLogRepository>();
+    private readonly IImportErrorsCsvBuilder _csvBuilder = Substitute.For<IImportErrorsCsvBuilder>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
 
     public NotificationDispatchServiceTests()
@@ -26,7 +27,7 @@ public class NotificationDispatchServiceTests
     }
 
     private NotificationDispatchService CreateSut(int digestMaxRows = 5) => new(
-        _identity, _renderer, _emailSender, _outboxRepo, _logRepo,
+        _identity, _renderer, _emailSender, _outboxRepo, _logRepo, _csvBuilder,
         Options.Create(new NotificationsOptions { DigestMaxRows = digestMaxRows, AppBaseUrl = "https://app.litigapp.co" }),
         _clock);
 
@@ -51,7 +52,7 @@ public class NotificationDispatchServiceTests
         _identity.GetUserProfileAsync("user-1", Arg.Any<CancellationToken>())
             .Returns(new UserProfile("sergio@example.com", "Sergio Molina"));
         _emailSender.SendAsync(
-                "sergio@example.com", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                "sergio@example.com", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>())
             .Returns(Result<string>.Success("resend-id-1"));
 
         await CreateSut().DispatchAsync(message, default);
@@ -75,13 +76,14 @@ public class NotificationDispatchServiceTests
         _identity.GetUserProfileAsync("user-1", Arg.Any<CancellationToken>())
             .Returns(new UserProfile("sergio@example.com", "Sergio Molina"));
         _emailSender.SendAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>())
             .Returns(Result<string>.Success("id"));
 
         await CreateSut().DispatchAsync(message, default);
 
         await _emailSender.Received(1).SendAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), outboxId.ToString(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), outboxId.ToString(),
+            Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -91,7 +93,7 @@ public class NotificationDispatchServiceTests
         _identity.GetUserProfileAsync("user-1", Arg.Any<CancellationToken>())
             .Returns(new UserProfile("sergio@example.com", "Sergio Molina"));
         _emailSender.SendAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>())
             .Returns(Result<string>.Success("id"));
 
         await CreateSut(digestMaxRows: 5).DispatchAsync(message, default);
@@ -104,7 +106,7 @@ public class NotificationDispatchServiceTests
     [Fact]
     public async Task ImportComplete_Success_RendersAndSends_EmptyProcessIds()
     {
-        var payload = new ImportCompleteOutboxPayload(Guid.NewGuid(), "portafolio.xlsx", 10, 1, 2, 7, DateTimeOffset.UtcNow);
+        var payload = new ImportCompleteOutboxPayload(Guid.NewGuid(), "portafolio.xlsx", 10, 1, 2, 7, DateTimeOffset.UtcNow, Errors: []);
         var message = new OutboxMessage
         {
             Id = Guid.NewGuid(), UserId = "user-1", EventType = "ImportComplete", Channel = "email",
@@ -113,7 +115,7 @@ public class NotificationDispatchServiceTests
         _identity.GetUserProfileAsync("user-1", Arg.Any<CancellationToken>())
             .Returns(new UserProfile("sergio@example.com", "Sergio Molina"));
         _emailSender.SendAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>())
             .Returns(Result<string>.Success("id"));
 
         await CreateSut().DispatchAsync(message, default);
@@ -122,6 +124,42 @@ public class NotificationDispatchServiceTests
         _renderer.Received(1).Render(EmailTemplate.ImportComplete, Arg.Any<IReadOnlyDictionary<string, object?>>());
         await _logRepo.Received(1).InsertAsync(
             Arg.Is<NotificationLog>(l => l.ProcessIds.Length == 0 && l.EventType == "ImportComplete"),
+            Arg.Any<CancellationToken>());
+        _csvBuilder.DidNotReceive().Build(Arg.Any<IReadOnlyList<ImportErrorRow>>());
+        await _emailSender.Received(1).SendAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(),
+            Arg.Is<IReadOnlyList<EmailAttachment>?>(a => a == null || a.Count == 0),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ImportComplete_WithErrors_AttachesCsvBuiltFromThoseErrors()
+    {
+        var errors = new List<ImportErrorRow> { new(5, "17001400301020240019200", "INVALID_RADICADO", "no tiene 23 dígitos") };
+        var payload = new ImportCompleteOutboxPayload(Guid.NewGuid(), "portafolio.xlsx", 8, 8, 0, 1, DateTimeOffset.UtcNow, Errors: errors);
+        var message = new OutboxMessage
+        {
+            Id = Guid.NewGuid(), UserId = "user-1", EventType = "ImportComplete", Channel = "email",
+            Payload = JsonSerializer.Serialize(payload), Status = "pending", CreatedAt = DateTimeOffset.UtcNow,
+        };
+        _identity.GetUserProfileAsync("user-1", Arg.Any<CancellationToken>())
+            .Returns(new UserProfile("sergio@example.com", "Sergio Molina"));
+        var csvBytes = "Fila,Radicado,Motivo\r\n"u8.ToArray();
+        _csvBuilder.Build(Arg.Is<IReadOnlyList<ImportErrorRow>>(rows => rows.Count == 1 && rows[0].Code == "INVALID_RADICADO"))
+            .Returns(csvBytes);
+        _emailSender.SendAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>())
+            .Returns(Result<string>.Success("id"));
+
+        await CreateSut().DispatchAsync(message, default);
+
+        await _emailSender.Received(1).SendAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(),
+            Arg.Is<IReadOnlyList<EmailAttachment>?>(a =>
+                a != null && a.Count == 1 &&
+                a[0].FileName == "procesos_con_errores.csv" &&
+                a[0].ContentType == "text/csv" &&
+                a[0].Content == csvBytes),
             Arg.Any<CancellationToken>());
     }
 
@@ -133,7 +171,7 @@ public class NotificationDispatchServiceTests
         _identity.GetUserProfileAsync("user-1", Arg.Any<CancellationToken>())
             .Returns(new UserProfile("sergio@example.com", "Sergio Molina"));
         _emailSender.SendAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>())
             .Returns(Result<string>.Failure("resend_down"));
 
         await CreateSut().DispatchAsync(message, default);
@@ -156,7 +194,7 @@ public class NotificationDispatchServiceTests
 
         Assert.Equal("failed", message.Status);
         await _emailSender.DidNotReceive().SendAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>());
         await _logRepo.DidNotReceive().InsertAsync(Arg.Any<NotificationLog>(), Arg.Any<CancellationToken>());
     }
 
@@ -175,6 +213,6 @@ public class NotificationDispatchServiceTests
 
         Assert.Equal("failed", message.Status);
         await _emailSender.DidNotReceive().SendAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IReadOnlyList<EmailAttachment>?>(), Arg.Any<CancellationToken>());
     }
 }

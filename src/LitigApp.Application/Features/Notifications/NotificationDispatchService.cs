@@ -13,6 +13,7 @@ public sealed class NotificationDispatchService(
     IEmailSender emailSender,
     IOutboxRepository outboxRepo,
     INotificationLogRepository notificationLogRepo,
+    IImportErrorsCsvBuilder csvBuilder,
     IOptions<NotificationsOptions> options,
     IDateTimeProvider clock) : INotificationDispatchService
 {
@@ -29,6 +30,7 @@ public sealed class NotificationDispatchService(
         EmailTemplate template;
         string subject;
         Guid[] processIds;
+        IReadOnlyList<EmailAttachment>? attachments = null;
 
         var opts = options.Value;
         var year = clock.UtcNow.Year;
@@ -62,6 +64,14 @@ public sealed class NotificationDispatchService(
                     payload.ErrorCount, $"{opts.AppBaseUrl}/processes", year);
                 subject = ImportCompleteEmailModelBuilder.BuildSubject(payload.SuccessCount);
                 processIds = [];
+
+                // Attach the same CSV the download endpoint serves (blueprint §9 "CSV de
+                // errores") — only when there's something to report.
+                if (payload.Errors.Count > 0)
+                {
+                    var csvBytes = csvBuilder.Build(payload.Errors);
+                    attachments = [new EmailAttachment("procesos_con_errores.csv", "text/csv", csvBytes)];
+                }
                 break;
             }
             default:
@@ -73,7 +83,8 @@ public sealed class NotificationDispatchService(
 
         // Idempotency key = the outbox row id: a Polly retry or a later fallback-sweep
         // re-attempt of the SAME row never results in a duplicate email server-side.
-        var sendResult = await emailSender.SendAsync(profile.Email, subject, html, message.Id.ToString(), ct);
+        var sendResult = await emailSender.SendAsync(
+            profile.Email, subject, html, message.Id.ToString(), attachments, ct);
 
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
 

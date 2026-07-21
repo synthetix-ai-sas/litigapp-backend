@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Resend;
+using EmailAttachment = LitigApp.Application.Common.Abstractions.EmailAttachment;
 
 namespace LitigApp.Infrastructure.UnitTests.Notifications;
 
@@ -82,6 +83,45 @@ public class ResendEmailSenderTests
         await CreateSut().SendAsync("real-lawyer@example.com", "Asunto", "<p>hi</p>");
 
         Assert.Contains(captured!.To, a => a.Email == "real-lawyer@example.com");
+    }
+
+    [Fact]
+    public async Task SendAsync_WithAttachment_MapsToResendAttachment()
+    {
+        EmailMessage? captured = null;
+        _resend.EmailSendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                captured = ci.Arg<EmailMessage>();
+                return Task.FromResult(new ResendResponse<Guid>(Guid.NewGuid(), null!));
+            });
+        var csvBytes = "Fila,Radicado,Motivo\r\n"u8.ToArray();
+
+        await CreateSut().SendAsync("lawyer@example.com", "Asunto", "<p>hi</p>",
+            attachments: [new EmailAttachment("procesos_con_errores.csv", "text/csv", csvBytes)]);
+
+        Assert.NotNull(captured);
+        var attachment = Assert.Single(captured!.Attachments!);
+        Assert.Equal("procesos_con_errores.csv", attachment.Filename);
+        Assert.Equal("text/csv", attachment.ContentType);
+        Assert.Equal(csvBytes, (byte[])attachment.Content!);
+    }
+
+    [Fact]
+    public async Task SendAsync_NoAttachments_SendsNoneToResend()
+    {
+        EmailMessage? captured = null;
+        _resend.EmailSendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                captured = ci.Arg<EmailMessage>();
+                return Task.FromResult(new ResendResponse<Guid>(Guid.NewGuid(), null!));
+            });
+
+        await CreateSut().SendAsync("lawyer@example.com", "Asunto", "<p>hi</p>");
+
+        Assert.NotNull(captured);
+        Assert.True(captured!.Attachments is null || captured.Attachments.Count == 0);
     }
 
     [Fact]

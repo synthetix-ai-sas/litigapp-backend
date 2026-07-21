@@ -211,6 +211,8 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.AddScoped<IExcelParser, ClosedXmlExcelParser>();
         services.AddSingleton<IImportPreviewCache, ImportPreviewCache>();
+        // Stateless — shared by the ImportComplete email attachment and the download endpoint.
+        services.AddSingleton<IImportErrorsCsvBuilder, ImportErrorsCsvBuilder>();
 
         // ── Sync engine state (sync_state KV: WAF cooldown + adaptive throttle) ─
         services.AddScoped<ISyncStateService, SyncStateService>();
